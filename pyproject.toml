@@ -39,16 +39,12 @@ tier1 = [
     "protobuf>=3.20",
     "sentencepiece>=0.1",
 ]
-benchmarks = [
-    "datasets>=2.0",
-]
 all = [
     "openai>=1.0",
     "anthropic>=0.30",
     "google-generativeai>=0.3",
     "torch>=2.0",
     "transformers>=4.40",
-    "datasets>=2.0",
 ]
 dev = [
     "pytest>=8.0",

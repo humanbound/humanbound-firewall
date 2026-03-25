@@ -19,7 +19,6 @@ import tempfile
 import zipfile
 from typing import Optional
 
-DEFAULT_TIER1_MODEL = "protectai/deberta-v3-base-prompt-injection-v2"
 MAX_TURNS = 20
 
 
@@ -128,132 +127,172 @@ def extract_qa_texts(logs):
 
 
 # ---------------------------------------------------------------------------
-# Evaluation
+# Curated data selection
 # ---------------------------------------------------------------------------
 
-def evaluate_policy_coverage(classify_fn, permitted, restricted):
-    results = {"restricted": [], "permitted": []}
-    for intent in (restricted or []):
-        r = classify_fn([{"u": intent.lower(), "a": ""}])
-        results["restricted"].append({
-            "intent": intent, "decision": r["decision"],
-            "covered": r["decision"] != "ALLOW"})
-    for intent in (permitted or []):
-        r = classify_fn([{"u": intent.lower(), "a": ""}])
-        results["permitted"].append({
-            "intent": intent, "decision": r["decision"],
-            "correct": r["decision"] == "ALLOW"})
-
-    rc = sum(1 for r in results["restricted"] if r["covered"])
-    pc = sum(1 for r in results["permitted"] if r["correct"])
-    return {
-        "restricted_coverage": round(rc / len(results["restricted"]), 4) if results["restricted"] else None,
-        "restricted_covered": rc, "restricted_total": len(results["restricted"]),
-        "permitted_coverage": round(pc / len(results["permitted"]), 4) if results["permitted"] else None,
-        "permitted_correct": pc, "permitted_total": len(results["permitted"]),
-        "gaps": [r for r in results["restricted"] if not r["covered"]],
-        "false_blocks": [r for r in results["permitted"] if not r["correct"]],
-    }
+CURATED_TARGET = 60
 
 
-def _run_attack_benchmark(classify_fn, dataset_name, split, text_field,
-                           label_field, attack_label, tier1_model=None):
-    try:
-        from datasets import load_dataset
-        ds = load_dataset(dataset_name, split=split)
-    except Exception as e:
-        return {"dataset": dataset_name, "error": str(e)[:200]}
+def _allocate_stratified(buckets, target):
+    """Allocate target budget across buckets preserving distribution.
 
-    tier1_pipe = None
-    if tier1_model:
-        os.environ["TOKENIZERS_PARALLELISM"] = "false"
-        from transformers import pipeline as hf_pipeline
-        tier1_pipe = hf_pipeline("text-classification", model=tier1_model,
-                                  truncation=True, max_length=512)
+    Guarantees at least 1 per bucket (if budget allows).
+    Remaining budget distributed proportionally.
+    """
+    total = sum(len(v) for v in buckets.values())
+    if total == 0:
+        return {}
 
-    y_true, t1_dec, t2_dec, combined = [], [], [], []
-    for s in ds:
-        text = s.get(text_field, "")
-        if not text or not text.strip():
+    n_cats = len(buckets)
+    allocation = {}
+
+    # Phase 1: guarantee 1 per category
+    guaranteed = min(n_cats, target)
+    for cat in buckets:
+        allocation[cat] = 1
+    remaining = target - guaranteed
+
+    # Phase 2: distribute remaining proportionally
+    if remaining > 0:
+        for cat in buckets:
+            share = round(len(buckets[cat]) / total * remaining)
+            allocation[cat] += share
+
+    # Cap to available and budget
+    total_alloc = sum(allocation.values())
+    if total_alloc > target:
+        # Trim largest buckets first
+        for cat in sorted(allocation, key=lambda c: allocation[c], reverse=True):
+            excess = total_alloc - target
+            if excess <= 0:
+                break
+            trim = min(excess, allocation[cat] - 1)
+            allocation[cat] -= trim
+            total_alloc -= trim
+
+    for cat in allocation:
+        allocation[cat] = min(allocation[cat], len(buckets[cat]))
+
+    return allocation
+
+
+def _curate_attack_logs(logs, target=CURATED_TARGET):
+    """Select diverse attack examples stratified by fail_category.
+
+    At least 1 per fail_category, then proportional distribution.
+    Sorted by severity DESC within each category.
+    Last 2-3 turns per conversation (attack payload).
+    """
+    from collections import defaultdict
+
+    failed = [l for l in logs
+              if "adversarial" in (l.get("test_category") or "")
+              and l.get("result") == "fail"]
+
+    if not failed:
+        passed_adv = [l for l in logs
+                      if "adversarial" in (l.get("test_category") or "")
+                      and l.get("result") == "pass"]
+        passed_adv.sort(key=lambda l: l.get("confidence", 0), reverse=True)
+        return _extract_last_turns(passed_adv[:target])
+
+    buckets = defaultdict(list)
+    for log in failed:
+        cat = log.get("fail_category") or "other"
+        buckets[cat].append(log)
+
+    for cat in buckets:
+        buckets[cat].sort(key=lambda l: (l.get("severity", 0), l.get("confidence", 0)),
+                          reverse=True)
+
+    allocation = _allocate_stratified(buckets, target)
+
+    selected = []
+    for cat, quota in allocation.items():
+        selected.extend(buckets[cat][:quota])
+
+    return _extract_last_turns(selected)
+
+
+def _curate_benign_logs(logs, target=CURATED_TARGET, fallback=None):
+    """Select diverse benign examples stratified by gen_category.
+
+    At least 1 per gen_category, then uniform distribution.
+    Sorted by confidence DESC within each category.
+    """
+    from collections import defaultdict
+
+    passed_qa = [l for l in logs
+                 if "adversarial" not in (l.get("test_category") or "")
+                 and l.get("result") == "pass"]
+
+    if not passed_qa:
+        return fallback[:target] if fallback else []
+
+    buckets = defaultdict(list)
+    for log in passed_qa:
+        cat = log.get("gen_category") or "other"
+        buckets[cat].append(log)
+
+    for cat in buckets:
+        buckets[cat].sort(key=lambda l: l.get("confidence", 0), reverse=True)
+
+    allocation = _allocate_stratified(buckets, target)
+
+    selected = []
+    for cat, quota in allocation.items():
+        selected.extend(buckets[cat][:quota])
+
+    return _extract_qa_turns_from_logs(selected)
+
+
+def _extract_last_turns(logs, n_last=3):
+    """Extract last N turns from conversations with context."""
+    texts = []
+    for log in logs:
+        conv = log.get("conversation", [])
+        if not conv:
             continue
-        is_attack = 1 if s.get(label_field) == attack_label else 0
-        y_true.append(is_attack)
-
-        t1 = None
-        if tier1_pipe:
-            r = tier1_pipe(text[:512])[0]
-            if r["label"] in ("INJECTION", "LABEL_1", "positive", "1") and r["score"] > 0.5:
-                t1 = "BLOCK"
-        t1_dec.append(t1)
-
-        t2 = classify_fn([{"u": text, "a": ""}])
-        t2_dec.append(t2["decision"])
-        combined.append(t1 if t1 == "BLOCK" else t2["decision"])
-
-    total = len(y_true)
-    atk = sum(1 for t in y_true if t == 1)
-    result = {
-        "dataset": dataset_name, "total": total,
-        "attacks": {
-            "total": atk,
-            "blocked": sum(1 for t, d in zip(y_true, combined) if t == 1 and d == "BLOCK"),
-            "escalated": sum(1 for t, d in zip(y_true, combined) if t == 1 and d == "ESCALATE"),
-            "allowed": sum(1 for t, d in zip(y_true, combined) if t == 1 and d == "ALLOW"),
-        },
-        "benign": {
-            "total": total - atk,
-            "allowed": sum(1 for t, d in zip(y_true, combined) if t == 0 and d == "ALLOW"),
-            "blocked": sum(1 for t, d in zip(y_true, combined) if t == 0 and d == "BLOCK"),
-        },
-    }
-    if tier1_pipe:
-        result["tier1"] = {
-            "attacks_blocked": sum(1 for t, d in zip(y_true, t1_dec) if t == 1 and d == "BLOCK"),
-            "benign_blocked": sum(1 for t, d in zip(y_true, t1_dec) if t == 0 and d == "BLOCK"),
-        }
-        t2_seen = sum(1 for t, d in zip(y_true, t1_dec) if t == 1 and d != "BLOCK")
-        t2_caught = sum(1 for t, d1, d2 in zip(y_true, t1_dec, t2_dec)
-                        if t == 1 and d1 != "BLOCK" and d2 == "BLOCK")
-        result["tier2"] = {"attacks_seen": t2_seen, "attacks_blocked": t2_caught}
-    return result
+        start = max(0, len(conv) - n_last)
+        for i in range(start, len(conv)):
+            user_msg = conv[i].get("u") or conv[i].get("user") or ""
+            if not user_msg.strip() or len(user_msg.strip()) < 10:
+                continue
+            ctx_start = max(0, i - 2)
+            parts = []
+            for j in range(ctx_start, i + 1):
+                t = conv[j]
+                a = t.get("a") or t.get("assistant") or ""
+                u = t.get("u") or t.get("user") or ""
+                if a:
+                    parts.append(f"Agent: {a}")
+                if u:
+                    parts.append(f"User: {u}")
+            texts.append("\n".join(parts))
+    return texts
 
 
-def _run_benign_benchmark(classify_fn, dataset_name, split, text_field):
-    try:
-        from datasets import load_dataset
-        ds = load_dataset(dataset_name, split=split)
-    except Exception as e:
-        return {"dataset": dataset_name, "type": "benign", "error": str(e)[:200]}
-
-    decisions = []
-    for s in ds:
-        text = s.get(text_field, "")
-        if not text or not text.strip():
-            continue
-        decisions.append(classify_fn([{"u": text, "a": ""}])["decision"])
-
-    total = len(decisions)
-    return {
-        "dataset": dataset_name, "type": "benign", "total": total,
-        "allowed": sum(1 for d in decisions if d == "ALLOW"),
-        "escalated": sum(1 for d in decisions if d == "ESCALATE"),
-        "blocked": sum(1 for d in decisions if d == "BLOCK"),
-    }
-
-
-def evaluate_benchmarks(classify_fn, run_tier1=True, benign_dataset=None):
-    tier1 = DEFAULT_TIER1_MODEL if run_tier1 else None
-    benchmarks = []
-    for ds_name, label in [("deepset/prompt-injections", 1),
-                            ("neuralchemy/Prompt-injection-dataset", 1)]:
-        benchmarks.append(_run_attack_benchmark(
-            classify_fn, ds_name, "test", "text", "label", label, tier1))
-    if benign_dataset:
-        benchmarks.append(_run_benign_benchmark(
-            classify_fn, benign_dataset["dataset"],
-            benign_dataset.get("split", "test"),
-            benign_dataset.get("text_field", "text")))
-    return benchmarks
+def _extract_qa_turns_from_logs(logs):
+    """Extract individual turns from QA logs with context."""
+    texts = []
+    for log in logs:
+        conv = log.get("conversation", [])
+        for i, turn in enumerate(conv):
+            user_msg = turn.get("u") or turn.get("user") or ""
+            if not user_msg.strip() or len(user_msg.strip()) < 10:
+                continue
+            ctx_start = max(0, i - 2)
+            parts = []
+            for j in range(ctx_start, i + 1):
+                t = conv[j]
+                a = t.get("a") or t.get("assistant") or ""
+                u = t.get("u") or t.get("user") or ""
+                if a:
+                    parts.append(f"Agent: {a}")
+                if u:
+                    parts.append(f"User: {u}")
+            texts.append("\n".join(parts))
+    return texts
 
 
 # ---------------------------------------------------------------------------
@@ -278,45 +317,50 @@ class HBFW:
         permitted_texts = [i.lower() for i in (permitted_intents or [])]
         benign_texts = qa_texts if qa_texts else permitted_texts
 
+        # Curated subsets: stratified, high-quality examples for few-shot training
+        curated_attack = _curate_attack_logs(logs)
+        curated_benign = _curate_benign_logs(logs, fallback=permitted_texts)
+
         return {
             "attack_texts": attack_texts,
             "benign_texts": benign_texts,
+            "curated_attack": curated_attack,
+            "curated_benign": curated_benign,
             "restricted_texts": restricted_texts,
             "permitted_texts": permitted_texts,
             "has_qa": self._has_qa,
             "stats": {
                 "attack_samples": len(attack_texts),
                 "benign_samples": len(benign_texts),
+                "curated_attack": len(curated_attack),
+                "curated_benign": len(curated_benign),
                 "restricted_intents": len(restricted_texts),
                 "permitted_intents": len(permitted_texts),
             },
         }
 
-    def train(self, data, permitted_intents=None, restricted_intents=None,
-              benign_dataset=None):
+    def train(self, data, permitted_intents=None, restricted_intents=None):
         context = {
             "permitted_intents": permitted_intents or [],
             "restricted_intents": restricted_intents or [],
+            "all_attack_texts": data["attack_texts"],
+            "all_benign_texts": data["benign_texts"],
         }
 
-        if len(data["attack_texts"]) >= 10:
-            self.clf_attack.train(data["attack_texts"], context=context)
+        # Pass curated data if available, full data as fallback
+        attack_train = data.get("curated_attack") or data["attack_texts"]
+        benign_train = data.get("curated_benign") or (data["benign_texts"] + data["permitted_texts"])
 
-        benign_all = data["benign_texts"] + data["permitted_texts"]
-        if len(benign_all) >= 10:
-            self.clf_benign.train(benign_all, context=context)
+        if len(attack_train) >= 5:
+            self.clf_attack.train(attack_train, context=context)
+
+        if len(benign_train) >= 5:
+            self.clf_benign.train(benign_train, context=context)
 
         self._performance = {
             "stats": data.get("stats", {}),
             "has_qa_data": data.get("has_qa", False),
         }
-
-        if permitted_intents or restricted_intents:
-            self._performance["policy_coverage"] = evaluate_policy_coverage(
-                self.classify, permitted_intents, restricted_intents)
-
-        self._performance["benchmarks"] = evaluate_benchmarks(
-            self.classify, benign_dataset=benign_dataset)
 
         return self._performance
 
