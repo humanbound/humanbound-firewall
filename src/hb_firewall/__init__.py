@@ -6,7 +6,7 @@ Tier 2:   Agent-specific classification (trained, multi-turn, 3+ turns)
 Tier 3:   LLM-as-a-judge (handles uncertain cases)
 """
 
-__version__ = "1.0.0"
+__version__ = "0.1.0"
 
 from .firewall import Firewall, AttackDetector, AttackDetectorEnsemble
 from .models import EvalResult, AgentConfig, Verdict, Category, Turn

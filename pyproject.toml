@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hb-firewall"
-version = "1.0.0"
+version = "0.1.0"
 description = "Multi-tier firewall for AI agents — prompt injection, jailbreak, and scope violation protection"
 readme = "README.md"
 license = "AGPL-3.0-only"
