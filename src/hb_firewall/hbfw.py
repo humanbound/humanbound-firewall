@@ -362,6 +362,10 @@ class HBFW:
             "has_qa_data": data.get("has_qa", False),
         }
 
+        # Capture validation metrics from detectors (if they report them)
+        if hasattr(self.clf_attack, "metrics") and self.clf_attack.metrics:
+            self._performance["validation"] = self.clf_attack.metrics
+
         return self._performance
 
     def classify(self, conversation: list[dict]) -> dict:
