@@ -119,8 +119,9 @@ hb firewall train
 ```python
 fw = Firewall.from_config(
     "agent.yaml",
-    model_path="firewall.hbfw",        # Enables Tier 2
-    attack_detectors=[
+    model_path="firewall.hbfw",                        # Trained Tier 2 model
+    detector_script="detectors/setfit_classifier.py",   # AgentClassifier script
+    attack_detectors=[                                   # Tier 1 ensemble
         {"model": "protectai/deberta-v3-base-prompt-injection-v2"},
     ],
 )
@@ -294,7 +295,8 @@ intents:
 settings:
   timeout: 5
   mode: block              # block | log | passthrough
-  session_window: 5
+  session_window: 5        # conversation turns for context
+  tier2_min_turns: 3       # Tier 2 activates after N turns
   temperature: 0.0
 ```
 
@@ -340,6 +342,20 @@ pip install hb-firewall[all]         # Everything
 | Tier 3 LLM | openai / anthropic / google-generativeai |
 | Tier 2 (SetFit) | setfit, sentence-transformers, scikit-learn |
 
+## Training from Test Data
+
+Train Tier 2 classifiers from your [Humanbound](https://humanbound.ai) adversarial and QA test results using the [Humanbound CLI](https://docs.humanbound.ai/integrations/firewall/):
+
+```bash
+pip install humanbound-cli
+hb login
+hb test                    # Run adversarial tests
+hb firewall train          # Train Tier 2 model
+hb firewall show model.hbfw
+```
+
+See the [CLI firewall documentation](https://docs.humanbound.ai/integrations/firewall/) for full training options and agent configuration.
+
 ## License
 
-AGPL-3.0 — free to use, modify, and distribute. If you run a modified version as a service, you must open-source your changes. For commercial licensing without the AGPL obligations, contact [sales@humanbound.ai](mailto:sales@humanbound.ai).
+AGPL-3.0 — free to use, modify, and distribute. If you run a modified version as a service, you must open-source your changes. For commercial licensing without the AGPL obligations, contact [hello@humanbound.ai](mailto:hello@humanbound.ai).
