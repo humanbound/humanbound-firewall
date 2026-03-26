@@ -397,7 +397,6 @@ class HBFW:
         return {
             "config": {
                 "version": "2.0",
-                "model": getattr(self.clf_attack, '_model_path', ''),
                 "performance": self._performance or {},
             },
             "weights": weights,

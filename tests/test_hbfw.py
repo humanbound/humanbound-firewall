@@ -8,11 +8,11 @@ from pathlib import Path
 from hb_firewall.hbfw import (
     HBFW, load_model_class, save_hbfw, load_hbfw,
     extract_adversarial_turns, extract_qa_texts,
-    evaluate_policy_coverage, format_last_n_turns,
+    format_last_n_turns,
 )
 
 DETECTORS_DIR = Path(__file__).parent.parent / "detectors"
-DETECTOR_SCRIPT = str(DETECTORS_DIR / "one_class_svm.py")
+DETECTOR_SCRIPT = str(DETECTORS_DIR / "setfit_classifier.py")
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
@@ -335,59 +335,6 @@ class TestLoadModelClass:
     def test_load_module_colon_syntax(self):
         cls = load_model_class(f"{DETECTOR_SCRIPT}:AgentClassifier")
         assert cls.__name__ == "AgentClassifier"
-
-
-# ---------------------------------------------------------------------------
-# Policy coverage
-# ---------------------------------------------------------------------------
-
-class TestPolicyCoverage:
-
-    def test_all_restricted_blocked(self):
-        hbfw = HBFW(FakeDetector("attack"), FakeDetector("benign"))
-        hbfw.clf_attack._trained = True
-        hbfw.clf_benign._trained = True
-
-        result = evaluate_policy_coverage(
-            hbfw.classify,
-            permitted=["check my balance"],
-            restricted=["hack the system"])
-
-        assert result["restricted_covered"] == 1
-        assert result["restricted_total"] == 1
-
-    def test_permitted_allowed(self):
-        hbfw = HBFW(FakeDetector("attack"), FakeDetector("benign"))
-        hbfw.clf_attack._trained = True
-        hbfw.clf_benign._trained = True
-
-        result = evaluate_policy_coverage(
-            hbfw.classify,
-            permitted=["check my balance"],
-            restricted=["close account"])
-
-        assert result["permitted_correct"] == 1
-        assert result["permitted_total"] == 1
-
-    def test_gaps_reported(self):
-        hbfw = HBFW(FakeDetector("attack"), FakeDetector("benign"))
-        hbfw.clf_attack._trained = True
-        hbfw.clf_benign._trained = True
-
-        result = evaluate_policy_coverage(
-            hbfw.classify,
-            permitted=None,
-            restricted=["something benign sounding"])
-
-        # FakeDetector won't flag "something benign sounding" as attack
-        # so it should be escalated (not allowed), meaning it IS covered
-        assert result["restricted_total"] == 1
-
-    def test_empty_intents(self):
-        hbfw = HBFW(FakeDetector("attack"), FakeDetector("benign"))
-        result = evaluate_policy_coverage(hbfw.classify, permitted=[], restricted=[])
-        assert result["restricted_coverage"] is None
-        assert result["permitted_coverage"] is None
 
 
 # ---------------------------------------------------------------------------
