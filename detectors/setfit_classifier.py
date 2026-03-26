@@ -4,8 +4,7 @@ Trains a single SetFit model (attack vs benign) using contrastive learning
 on curated examples from adversarial + QA test logs. The attack detector
 trains the model; the benign detector reuses it (opposite interpretation).
 
-Training includes 80/20 stratified split with validation metrics
-(precision, recall, F1) reported and stored in the .hbfw config.
+Validation is handled by the orchestrator via conversation replay.
 
 Requires: setfit==1.1.3, sentence-transformers>=2.2, scikit-learn>=1.3
 
@@ -40,7 +39,7 @@ class AgentClassifier:
         self._model_dir = None
 
     def train(self, texts, context=None):
-        global _shared_model, _shared_metrics
+        global _shared_model
 
         if self.name == "benign":
             if _shared_model is not None:
@@ -123,9 +122,7 @@ class AgentClassifier:
             safe_key = "setfit_file_" + rel_path.replace("/", "__").replace(".", "_")
             result[safe_key] = np.void(model_files[rel_path])
 
-        # Store validation metrics
-        if self.metrics:
-            result["setfit_metrics"] = json.dumps(self.metrics)
+
 
         return result
 
@@ -153,5 +150,3 @@ class AgentClassifier:
 
         self._model = SetFitModel.from_pretrained(model_dir)
 
-        if "setfit_metrics" in weights:
-            self.metrics = json.loads(str(weights["setfit_metrics"]))
