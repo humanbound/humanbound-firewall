@@ -17,6 +17,10 @@ ST_MODEL = "all-MiniLM-L6-v2"
 MAX_EXAMPLES = 60
 VAL_SPLIT = 0.2
 
+# Workaround: the orchestrator creates two AgentClassifier instances (attack + benign)
+# expecting two independent models. SetFit trains a single binary model that handles
+# both roles — the benign instance reuses the attack instance's model with the
+# opposite probability interpretation. The shared state avoids training twice.
 _shared_model = None
 _shared_metrics = None
 
