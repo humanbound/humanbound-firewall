@@ -304,7 +304,7 @@ Portable zip archive:
 
 ```
 firewall.hbfw
-  |- config.json     # metadata, performance metrics, model script path
+  |- config.json     # metadata, detector type, performance metrics
   |- weights.npz     # classifier weights (defined by your AgentClassifier)
 ```
 

@@ -198,13 +198,12 @@ class Firewall:
 
             hbfw_config, hbfw_weights = load_hbfw(str(model_path))
 
-            script = detector_script or hbfw_config.get("model")
-            if not script:
+            if not detector_script:
                 raise ValueError(
                     "Tier 2 model requires a detector script. "
-                    "Pass detector_script= or ensure the .hbfw config has a 'model' path.")
+                    "Pass detector_script= to Firewall.from_config().")
 
-            detector_cls = load_model_class(str(script))
+            detector_cls = load_model_class(str(detector_script))
             scope_classifier = HBFW(
                 attack_detector=detector_cls("attack"),
                 benign_detector=detector_cls("benign"))
