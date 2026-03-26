@@ -129,36 +129,31 @@ class TestTier0Sanitization:
         assert result.tier == 3  # went to Tier 2 (no Tier 1 classifier loaded)
 
 
-class TestFirewallSession:
+class TestFirewallConversation:
 
-    def test_create_session(self):
+    def test_openai_format(self):
         fw = Firewall(AgentConfig(business_scope="test"), MockStreamer("P Valid."))
-        session = fw.create_session()
-        assert session.id
-        assert session.turn_count == 0
-
-    def test_session_evaluate(self):
-        fw = Firewall(AgentConfig(business_scope="test"), MockStreamer("P Valid."))
-        session = fw.create_session()
-        result = session.evaluate("hello")
+        result = fw.evaluate([
+            {"role": "user", "content": "hello"},
+            {"role": "assistant", "content": "Hi there!"},
+            {"role": "user", "content": "check my balance"},
+        ])
         assert result.passed
-        assert session.turn_count == 1
+        assert result.prompt == "check my balance"
 
-    def test_session_tracks_turns(self):
+    def test_single_prompt(self):
         fw = Firewall(AgentConfig(business_scope="test"), MockStreamer("P Valid."))
-        session = fw.create_session()
-        session.evaluate("hello")
-        session.add_response("Hi, how can I help?")
-        session.evaluate("check my balance")
-        assert session.turn_count == 2
+        result = fw.evaluate("hello")
+        assert result.passed
+        assert result.prompt == "hello"
 
-    def test_session_window(self):
-        fw = Firewall(AgentConfig(business_scope="test", session_window=2), MockStreamer("P Valid."))
-        session = fw.create_session()
-        for i in range(5):
-            session.evaluate(f"message {i}")
-            session.add_response(f"response {i}")
-        assert len(session.turns) == 2
+    def test_single_message_conversation(self):
+        fw = Firewall(AgentConfig(business_scope="test"), MockStreamer("P Valid."))
+        result = fw.evaluate([
+            {"role": "user", "content": "hello"},
+        ])
+        assert result.passed
+        assert result.prompt == "hello"
 
 
 class TestFirewallTimeout:

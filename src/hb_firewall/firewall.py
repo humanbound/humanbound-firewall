@@ -20,7 +20,6 @@ from .config import load_config
 from .judge import build_system_prompt
 from .cache import PromptCache
 from .metrics import Metrics
-from .session import Session
 from .llm import Provider, ProviderIntegration, ProviderName, get_llm_streamer
 
 _INVISIBLE_CHARS = re.compile(
@@ -391,10 +390,6 @@ class Firewall:
         from .firewall_judge import stream_and_extract_verdict
         return stream_and_extract_verdict(
             self._streamer, system_prompt, user_prompt, timeout, session_id)
-
-    def create_session(self, window_size: Optional[int] = None) -> Session:
-        return Session(firewall=self,
-                       window_size=window_size or self._config.session_window)
 
     def reload_config(self, config_path: Union[str, Path]):
         self._config = load_config(config_path)
