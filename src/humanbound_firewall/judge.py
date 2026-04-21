@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2024-2026 Humanbound
 """Judge prompt builder — constructs the system prompt for LLM evaluation."""
 
 from pathlib import Path

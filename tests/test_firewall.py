@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2024-2026 Humanbound
 """Tests for the Firewall class."""
 
 import pytest
@@ -5,8 +7,8 @@ import time as _time
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from hb_firewall.firewall import Firewall
-from hb_firewall.models import AgentConfig, Verdict, Category
+from humanbound_firewall.firewall import Firewall
+from humanbound_firewall.models import AgentConfig, Verdict, Category
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -32,9 +34,9 @@ class TestFirewallInit:
 
     def test_from_config(self):
         streamer = MockStreamer()
-        from hb_firewall.llm import Provider, ProviderIntegration
+        from humanbound_firewall.llm import Provider, ProviderIntegration
         with pytest.MonkeyPatch.context() as m:
-            m.setattr("hb_firewall.firewall.get_llm_streamer", lambda p: streamer)
+            m.setattr("humanbound_firewall.firewall.get_llm_streamer", lambda p: streamer)
             fw = Firewall.from_config(
                 FIXTURES / "agent.yaml",
                 provider=Provider(name="openai",

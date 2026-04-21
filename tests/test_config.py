@@ -1,9 +1,11 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2024-2026 Humanbound
 """Tests for configuration loading."""
 
 import pytest
 from pathlib import Path
 
-from hb_firewall.config import load_config
+from humanbound_firewall.config import load_config
 
 FIXTURES = Path(__file__).parent / "fixtures"
 

@@ -1,4 +1,6 @@
-"""Data models for hb-firewall."""
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2024-2026 Humanbound
+"""Data models for humanbound-firewall."""
 
 from dataclasses import dataclass, field
 from enum import Enum

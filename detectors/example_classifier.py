@@ -1,4 +1,6 @@
-"""Example AgentClassifier scaffold for hb-firewall Tier 2.
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2024-2026 Humanbound
+"""Example AgentClassifier scaffold for humanbound-firewall Tier 2.
 
 Copy this file and implement your own training and inference logic.
 The orchestrator creates two instances — one for attack detection,

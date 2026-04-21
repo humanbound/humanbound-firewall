@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2024-2026 Humanbound
 """Tests for the Tier 2 orchestrator (hbfw.py)."""
 
 import os
@@ -5,7 +7,7 @@ import pytest
 import tempfile
 from pathlib import Path
 
-from hb_firewall.hbfw import (
+from humanbound_firewall.hbfw import (
     HBFW, load_model_class, save_hbfw, load_hbfw,
     extract_adversarial_turns, extract_qa_texts,
     format_last_n_turns,
@@ -353,7 +355,7 @@ class TestFirewallTier2Integration:
         if not os.path.exists(model_path):
             pytest.skip(".hbfw model not found — run hb firewall train first")
 
-        from hb_firewall import Firewall
+        from humanbound_firewall import Firewall
         fw = Firewall.from_config(
             FIXTURES / "agent.yaml",
             model_path=model_path,
@@ -365,14 +367,14 @@ class TestFirewallTier2Integration:
 
     def test_from_config_without_tier2(self):
         """from_config works without Tier 2 — Tiers 0 + 3 only."""
-        from hb_firewall import Firewall
+        from humanbound_firewall import Firewall
         fw = Firewall.from_config(FIXTURES / "agent.yaml")
         result = fw.evaluate("hello")
         assert result.verdict is not None
 
     def test_from_config_missing_script_raises(self):
         """model_path without detector_script and no 'model' in config raises."""
-        from hb_firewall import Firewall
+        from humanbound_firewall import Firewall
 
         # Create a minimal .hbfw with no model path in config
         config = {"version": "2.0", "performance": {}}

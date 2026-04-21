@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2024-2026 Humanbound
 """Streaming LLM judge — extracts verdict from first token of streamed response."""
 
 import threading

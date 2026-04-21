@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2024-2026 Humanbound
 """Main Firewall class — multi-tier evaluation of user prompts.
 
 Tier 0:   Input sanitization (instant) — blocks non-visible control characters
@@ -56,7 +58,13 @@ class AttackDetector:
 
     def _score_local(self, prompt: str) -> float:
         if self._pipe is None:
-            from transformers import pipeline
+            try:
+                from transformers import pipeline
+            except ImportError as e:
+                raise ImportError(
+                    "Tier 1 local detectors require the [tier1] extra. "
+                    "Install with: pip install humanbound-firewall[tier1]"
+                ) from e
             self._pipe = pipeline("text-classification", model=self._model_name,
                                    truncation=True, max_length=512)
         result = self._pipe(prompt)[0]

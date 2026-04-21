@@ -1,4 +1,6 @@
-"""Azure OpenAI provider."""
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2024-2026 Humanbound
+"""OpenAI provider."""
 
 import requests
 import time
@@ -10,18 +12,21 @@ MAX_RETRY_COUNTER = 3
 LLM_PING_TIMEOUT = 90
 DEFAULT_TEMPERATURE = 0
 
+OPENAI_CHAT_COMPLETION_ENDPOINT = "https://api.openai.com/v1/chat/completions"
+
 
 class LLMStreamer:
     def __init__(self, provider=None):
         provider = _resolve(provider)
-        from openai import AzureOpenAI
-        integ = provider["integration"]
-        self.__client = AzureOpenAI(
-            api_key=integ["api_key"],
-            api_version=integ.get("api_version", "2024-06-01"),
-            azure_endpoint=integ.get("endpoint", ""),
-        )
-        self.model = integ["model"]
+        try:
+            from openai import OpenAI
+        except ImportError as e:
+            raise ImportError(
+                "OpenAI provider requires the [openai] extra. "
+                "Install with: pip install humanbound-firewall[openai]"
+            ) from e
+        self.__client = OpenAI(api_key=provider["integration"]["api_key"])
+        self.model = provider["integration"]["model"]
 
     def ping(self, system_p, user_p, max_tokens=DEFAULT_MAX_OUT_TOKENS,
              temperature=DEFAULT_TEMPERATURE):
@@ -42,15 +47,14 @@ class LLMPinger:
         self._provider = _resolve(provider)
 
     def __do_completion_api_call(self, system_p, user_p, max_tokens, temperature):
-        integ = self._provider["integration"]
         return requests.post(
-            integ.get("endpoint", ""),
+            OPENAI_CHAT_COMPLETION_ENDPOINT,
             headers={
                 "Content-Type": "application/json",
-                "Api-Key": integ["api_key"],
+                "Authorization": f"Bearer {self._provider['integration']['api_key']}",
             },
             json={
-                "model": integ["model"],
+                "model": self._provider["integration"]["model"],
                 "messages": [
                     {"role": "system", "content": system_p},
                     {"role": "user", "content": user_p},
@@ -88,13 +92,10 @@ class LLMPinger:
 
 
 def _resolve(provider):
+    """Resolve provider to dict format."""
     if provider is None:
-        return {"integration": {
-            "api_key": getenv("LLM_API_KEY", ""),
-            "model": getenv("LLM_MODEL", "gpt-4o-mini"),
-            "endpoint": getenv("LLM_ENDPOINT", ""),
-            "api_version": getenv("LLM_API_VERSION", "2024-06-01"),
-        }}
+        return {"integration": {"api_key": getenv("LLM_API_KEY", ""),
+                                "model": getenv("LLM_MODEL", "gpt-4o-mini")}}
     if hasattr(provider, "model_dump"):
         return provider.model_dump()
     return provider

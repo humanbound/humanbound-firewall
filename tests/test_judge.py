@@ -1,9 +1,11 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2024-2026 Humanbound
 """Tests for judge prompt builder."""
 
 import pytest
 
-from hb_firewall.models import AgentConfig, Turn
-from hb_firewall.judge import build_system_prompt, _format_few_shots, _format_session_context
+from humanbound_firewall.models import AgentConfig, Turn
+from humanbound_firewall.judge import build_system_prompt, _format_few_shots, _format_session_context
 
 
 class TestBuildSystemPrompt:

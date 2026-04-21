@@ -1,8 +1,10 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2024-2026 Humanbound
 """Tests for data models."""
 
 import pytest
 
-from hb_firewall.models import EvalResult, Verdict, Category, VERDICT_MAP
+from humanbound_firewall.models import EvalResult, Verdict, Category, VERDICT_MAP
 
 
 class TestEvalResult:

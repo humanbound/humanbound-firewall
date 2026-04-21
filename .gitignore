@@ -21,6 +21,8 @@ env/
 .pytest_cache/
 .coverage
 htmlcov/
+.ruff_cache/
+.mypy_cache/
 
 # IDE
 .idea/

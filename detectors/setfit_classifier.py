@@ -1,4 +1,6 @@
-"""SetFit-based AgentClassifier for Tier 2 of hb-firewall.
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2024-2026 Humanbound
+"""SetFit-based AgentClassifier for Tier 2 of humanbound-firewall.
 
 Trains a single SetFit model (attack vs benign) using contrastive learning
 on curated examples from adversarial + QA test logs. The attack detector

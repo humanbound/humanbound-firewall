@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2024-2026 Humanbound
 """LLM provider abstraction — supports OpenAI, Azure OpenAI, Anthropic Claude, and Gemini.
 
 Two interfaces:
@@ -17,13 +19,13 @@ def get_llm_pinger(provider):
     name = provider.name if isinstance(provider, Provider) else provider["name"]
 
     if name == ProviderName.AZURE_OPENAI or name == "azureopenai":
-        from hb_firewall.llm.azureopenai import LLMPinger
+        from humanbound_firewall.llm.azureopenai import LLMPinger
     elif name == ProviderName.OPENAI or name == "openai":
-        from hb_firewall.llm.openai import LLMPinger
+        from humanbound_firewall.llm.openai import LLMPinger
     elif name == ProviderName.CLAUDE or name == "claude":
-        from hb_firewall.llm.claude import LLMPinger
+        from humanbound_firewall.llm.claude import LLMPinger
     elif name == ProviderName.GEMINI or name == "gemini":
-        from hb_firewall.llm.gemini import LLMPinger
+        from humanbound_firewall.llm.gemini import LLMPinger
     else:
         raise ValueError(f"Unsupported LLM provider: {name}")
 
@@ -35,13 +37,13 @@ def get_llm_streamer(provider):
     name = provider.name if isinstance(provider, Provider) else provider["name"]
 
     if name == ProviderName.AZURE_OPENAI or name == "azureopenai":
-        from hb_firewall.llm.azureopenai import LLMStreamer
+        from humanbound_firewall.llm.azureopenai import LLMStreamer
     elif name == ProviderName.OPENAI or name == "openai":
-        from hb_firewall.llm.openai import LLMStreamer
+        from humanbound_firewall.llm.openai import LLMStreamer
     elif name == ProviderName.CLAUDE or name == "claude":
-        from hb_firewall.llm.claude import LLMStreamer
+        from humanbound_firewall.llm.claude import LLMStreamer
     elif name == ProviderName.GEMINI or name == "gemini":
-        from hb_firewall.llm.gemini import LLMStreamer
+        from humanbound_firewall.llm.gemini import LLMStreamer
     else:
         raise ValueError(f"Unsupported LLM provider: {name}")
 
