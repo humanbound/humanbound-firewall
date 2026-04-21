@@ -78,8 +78,8 @@ Optional per-provider extras: `[openai]`, `[anthropic]`, `[gemini]`.
 ### Basic Usage
 
 ```bash
-export HB_FIREWALL_PROVIDER=openai
-export HB_FIREWALL_API_KEY=sk-...
+export HUMANBOUND_FIREWALL_PROVIDER=openai
+export HUMANBOUND_FIREWALL_API_KEY=sk-...
 ```
 
 ```python

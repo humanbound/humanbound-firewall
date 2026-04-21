@@ -429,16 +429,47 @@ def _extract_token(chunk) -> Optional[str]:
     return None
 
 
-def _provider_from_env() -> Provider:
-    """Build a Provider from HB_FIREWALL_* environment variables."""
-    import os
+def _env(new_key: str, legacy_key: str, default=None):
+    """Read an env var, preferring the `HUMANBOUND_FIREWALL_*` name.
 
-    provider_name = os.environ.get("HB_FIREWALL_PROVIDER", "").lower()
-    api_key = os.environ.get("HB_FIREWALL_API_KEY", "")
+    Falls back to the legacy `HB_FIREWALL_*` name with a one-time
+    DeprecationWarning. The legacy names are removed in 0.3.
+    """
+    import os
+    import warnings
+
+    value = os.environ.get(new_key)
+    if value is not None:
+        return value
+    legacy_value = os.environ.get(legacy_key)
+    if legacy_value is not None:
+        warnings.warn(
+            f"Environment variable {legacy_key} is deprecated; "
+            f"use {new_key} instead. "
+            "The legacy HB_FIREWALL_* names will be removed in 0.3.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        return legacy_value
+    return default
+
+
+def _provider_from_env() -> Provider:
+    """Build a Provider from HUMANBOUND_FIREWALL_* environment variables.
+
+    Legacy HB_FIREWALL_* names still work for 0.2.x (with a DeprecationWarning);
+    they are removed in 0.3.
+    """
+    provider_name = (_env(
+        "HUMANBOUND_FIREWALL_PROVIDER", "HB_FIREWALL_PROVIDER", ""
+    ) or "").lower()
+    api_key = _env("HUMANBOUND_FIREWALL_API_KEY", "HB_FIREWALL_API_KEY", "")
 
     if not api_key:
         raise ValueError(
-            "No LLM provider configured. Set HB_FIREWALL_PROVIDER and HB_FIREWALL_API_KEY.")
+            "No LLM provider configured. "
+            "Set HUMANBOUND_FIREWALL_PROVIDER and HUMANBOUND_FIREWALL_API_KEY."
+        )
 
     defaults = {
         "openai": ("gpt-4o-mini", ProviderName.OPENAI),
@@ -456,8 +487,8 @@ def _provider_from_env() -> Provider:
         name=name_enum,
         integration=ProviderIntegration(
             api_key=api_key,
-            model=os.environ.get("HB_FIREWALL_MODEL", default_model),
-            endpoint=os.environ.get("HB_FIREWALL_ENDPOINT"),
-            api_version=os.environ.get("HB_FIREWALL_API_VERSION"),
+            model=_env("HUMANBOUND_FIREWALL_MODEL", "HB_FIREWALL_MODEL", default_model),
+            endpoint=_env("HUMANBOUND_FIREWALL_ENDPOINT", "HB_FIREWALL_ENDPOINT"),
+            api_version=_env("HUMANBOUND_FIREWALL_API_VERSION", "HB_FIREWALL_API_VERSION"),
         ),
     )

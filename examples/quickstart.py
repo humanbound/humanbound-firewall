@@ -3,8 +3,8 @@
 """Minimal runnable quickstart for humanbound-firewall.
 
 Run with:
-    export HB_FIREWALL_PROVIDER=openai
-    export HB_FIREWALL_API_KEY=sk-...
+    export HUMANBOUND_FIREWALL_PROVIDER=openai
+    export HUMANBOUND_FIREWALL_API_KEY=sk-...
     python examples/quickstart.py
 
 For the full examples gallery (banking agent, support agent, coding assistant,

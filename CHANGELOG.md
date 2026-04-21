@@ -47,6 +47,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stub will be yanked on or after 2026-06-20.
 - The `hb_firewall` module path. Import from `humanbound_firewall` instead.
   The alias will be removed in 0.3.
+- Environment variables renamed from `HB_FIREWALL_*` to `HUMANBOUND_FIREWALL_*`
+  (`HUMANBOUND_FIREWALL_PROVIDER`, `HUMANBOUND_FIREWALL_API_KEY`,
+  `HUMANBOUND_FIREWALL_MODEL`, `HUMANBOUND_FIREWALL_ENDPOINT`,
+  `HUMANBOUND_FIREWALL_API_VERSION`). The legacy `HB_FIREWALL_*` names still
+  work for 0.2.x with a `DeprecationWarning`; they are removed in 0.3.
 
 ## [0.1.0] — 2026-03-26
 
