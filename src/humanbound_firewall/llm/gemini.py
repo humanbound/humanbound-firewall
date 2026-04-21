@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2024-2026 Humanbound
 """Google Gemini provider."""
 
 import time
@@ -10,16 +12,27 @@ LLM_PING_TIMEOUT = 90
 DEFAULT_TEMPERATURE = 0.0
 
 
+def _import_genai():
+    try:
+        import google.generativeai as genai
+        return genai
+    except ImportError as e:
+        raise ImportError(
+            "Gemini provider requires the [gemini] extra. "
+            "Install with: pip install humanbound-firewall[gemini]"
+        ) from e
+
+
 class LLMStreamer:
     def __init__(self, provider=None):
         provider = _resolve(provider)
-        import google.generativeai as genai
+        genai = _import_genai()
         genai.configure(api_key=provider["integration"]["api_key"])
         self.model = genai.GenerativeModel(provider["integration"]["model"])
 
     def ping(self, system_p, user_p, max_tokens=DEFAULT_MAX_OUT_TOKENS,
              temperature=DEFAULT_TEMPERATURE):
-        import google.generativeai as genai
+        genai = _import_genai()
         max_tokens = min(max_tokens, ALLOWED_MAX_OUT_TOKENS)
         prompt = f"{system_p}\n{user_p}"
         return self.model.generate_content(
@@ -34,12 +47,12 @@ class LLMStreamer:
 class LLMPinger:
     def __init__(self, provider=None):
         self._provider = _resolve(provider)
-        import google.generativeai as genai
+        genai = _import_genai()
         genai.configure(api_key=self._provider["integration"]["api_key"])
         self.model = genai.GenerativeModel(self._provider["integration"]["model"])
 
     def __do_completion_api_call(self, prompt, max_tokens, temperature):
-        import google.generativeai as genai
+        genai = _import_genai()
         return self.model.generate_content(
             prompt,
             generation_config=genai.types.GenerationConfig(

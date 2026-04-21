@@ -1,8 +1,10 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2024-2026 Humanbound
 """Tests for metrics tracker."""
 
 import pytest
 
-from hb_firewall.metrics import Metrics
+from humanbound_firewall.metrics import Metrics
 
 
 class TestMetrics:

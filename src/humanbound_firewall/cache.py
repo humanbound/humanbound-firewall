@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2024-2026 Humanbound
 """Prompt cache — avoids rebuilding the system prompt on every evaluation."""
 
 import hashlib

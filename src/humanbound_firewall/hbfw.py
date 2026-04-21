@@ -1,4 +1,6 @@
-"""Tier 2 orchestrator for hb-firewall.
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2024-2026 Humanbound
+"""Tier 2 orchestrator for humanbound-firewall.
 
 Handles data extraction, training coordination, evaluation, and serialization.
 The actual ML model is injected — provide a Python file with a AgentClassifier class:
@@ -505,8 +507,19 @@ class HBFW:
 # .hbfw I/O
 # ---------------------------------------------------------------------------
 
+def _require_numpy():
+    try:
+        import numpy as np
+        return np
+    except ImportError as e:
+        raise ImportError(
+            "Saving/loading .hbfw models requires numpy (bundled with the [tier1] extra). "
+            "Install with: pip install humanbound-firewall[tier1]"
+        ) from e
+
+
 def save_hbfw(model_data, path):
-    import numpy as np
+    np = _require_numpy()
     with tempfile.TemporaryDirectory() as tmpdir:
         cp = os.path.join(tmpdir, "config.json")
         wp = os.path.join(tmpdir, "weights.npz")
@@ -519,7 +532,7 @@ def save_hbfw(model_data, path):
 
 
 def load_hbfw(path):
-    import numpy as np
+    np = _require_numpy()
     with zipfile.ZipFile(path, "r") as zf:
         with zf.open("config.json") as f:
             config = json.loads(f.read())

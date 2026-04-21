@@ -1,27 +1,44 @@
 [build-system]
-requires = ["setuptools>=68.0", "wheel"]
+requires = ["setuptools>=77.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "hb-firewall"
-version = "0.1.0"
+name = "humanbound-firewall"
+version = "0.2.0"
 description = "Multi-tier firewall for AI agents — prompt injection, jailbreak, and scope violation protection"
 readme = "README.md"
 license = "AGPL-3.0-only"
 requires-python = ">=3.10"
 authors = [
-    {name = "Humanbound", email = "oss@humanbound.ai"},
+    {name = "Humanbound", email = "hello@humanbound.ai"},
 ]
-keywords = ["ai", "firewall", "security", "llm", "prompt-injection", "guardrails", "agent-security"]
+maintainers = [
+    {name = "Demetris Gerogiannis", email = "hello@humanbound.ai"},
+    {name = "Kostas Siabanis", email = "hello@humanbound.ai"},
+]
+keywords = [
+    "ai",
+    "firewall",
+    "security",
+    "llm",
+    "prompt-injection",
+    "jailbreak",
+    "guardrails",
+    "agent-security",
+    "humanbound",
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Security",
     "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
 ]
 dependencies = [
     "pyyaml>=6.0",
@@ -45,23 +62,48 @@ all = [
     "google-generativeai>=0.3",
     "torch>=2.0",
     "transformers>=4.40",
+    "protobuf>=3.20",
+    "sentencepiece>=0.1",
 ]
 dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
+    "pytest-timeout>=2.3",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "build>=1.2",
+    "twine>=5.0",
+    "pre-commit>=3.8",
+    "numpy>=1.24",
 ]
 
 [project.urls]
-Homepage = "https://github.com/humanbound/firewall"
-Documentation = "https://github.com/humanbound/firewall#readme"
-Repository = "https://github.com/humanbound/firewall"
-Issues = "https://github.com/humanbound/firewall/issues"
+Homepage = "https://github.com/humanbound/humanbound-firewall"
+Documentation = "https://docs.humanbound.ai/defense/firewall/"
+Repository = "https://github.com/humanbound/humanbound-firewall"
+Issues = "https://github.com/humanbound/humanbound-firewall/issues"
+Changelog = "https://github.com/humanbound/humanbound-firewall/blob/main/CHANGELOG.md"
+Community = "https://docs.humanbound.ai/community/"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-hb_firewall = ["prompts/*.txt"]
+humanbound_firewall = ["prompts/*.txt", "py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+timeout = 60
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+check_untyped_defs = true

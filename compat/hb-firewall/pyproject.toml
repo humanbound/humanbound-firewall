@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=77.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hb-firewall"
+version = "0.2.0"
+description = "DEPRECATED: renamed to humanbound-firewall"
+readme = "README.md"
+license = "AGPL-3.0-only"
+requires-python = ">=3.10"
+authors = [
+    {name = "Humanbound", email = "hello@humanbound.ai"},
+]
+classifiers = [
+    "Development Status :: 7 - Inactive",
+    "Programming Language :: Python :: 3",
+    "Topic :: Security",
+]
+dependencies = [
+    "humanbound-firewall==0.2.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/humanbound/humanbound-firewall"
+Repository = "https://github.com/humanbound/humanbound-firewall"
+
+[tool.setuptools.packages.find]
+where = ["src"]

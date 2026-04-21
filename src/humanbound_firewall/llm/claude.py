@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2024-2026 Humanbound
 """Anthropic Claude provider."""
 
 import time
@@ -13,7 +15,13 @@ DEFAULT_TEMPERATURE = 0
 class LLMStreamer:
     def __init__(self, provider=None):
         provider = _resolve(provider)
-        import anthropic
+        try:
+            import anthropic
+        except ImportError as e:
+            raise ImportError(
+                "Anthropic provider requires the [anthropic] extra. "
+                "Install with: pip install humanbound-firewall[anthropic]"
+            ) from e
         self.client = anthropic.Anthropic(
             api_key=provider["integration"]["api_key"]
         )
@@ -34,7 +42,13 @@ class LLMStreamer:
 class LLMPinger:
     def __init__(self, provider=None):
         self._provider = _resolve(provider)
-        import anthropic
+        try:
+            import anthropic
+        except ImportError as e:
+            raise ImportError(
+                "Anthropic provider requires the [anthropic] extra. "
+                "Install with: pip install humanbound-firewall[anthropic]"
+            ) from e
         self.client = anthropic.Anthropic(
             api_key=self._provider["integration"]["api_key"]
         )
@@ -49,7 +63,13 @@ class LLMPinger:
 
     def ping(self, system_p, user_p, max_tokens=DEFAULT_MAX_OUT_TOKENS,
              temperature=DEFAULT_TEMPERATURE):
-        import anthropic
+        try:
+            import anthropic
+        except ImportError as e:
+            raise ImportError(
+                "Anthropic provider requires the [anthropic] extra. "
+                "Install with: pip install humanbound-firewall[anthropic]"
+            ) from e
         retry_counter = 0
         max_tokens = min(max_tokens, ALLOWED_MAX_OUT_TOKENS)
         while retry_counter <= MAX_RETRY_COUNTER:
