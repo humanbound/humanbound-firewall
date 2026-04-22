@@ -4,9 +4,8 @@
 Single-Member Private Company** (also known as "Humanbound"). This policy
 describes what you may and may not do with the Humanbound name and logo.
 
-The source code in this repository is open-source under [AGPL-3.0-only](./LICENSE)
-or a [commercial license](./COMMERCIAL.md). Open-source licensing does **not**
-grant rights to use the trademarks.
+The source code in this repository is open-source under [Apache-2.0](./LICENSE).
+Open-source licensing does **not** grant rights to use the trademarks.
 
 ## What you may do
 
@@ -27,7 +26,7 @@ grant rights to use the trademarks.
 - Suggest or imply official endorsement, partnership, certification, or
   sponsorship by Humanbound without a signed agreement
 - Distribute a modified version of `humanbound-firewall` under the Humanbound
-  name (a fork must be renamed — the AGPL permits the fork, but the trademark
+  name (a fork must be renamed — Apache-2.0 permits the fork, but the trademark
   does not permit the name)
 
 ## Permitted nominative use

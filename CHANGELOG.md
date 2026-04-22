@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.0] — 2026-04-21
 
 ### Changed
+- **License**: relicensed from AGPL-3.0-only (with a separate commercial
+  option) to **Apache-2.0**. External contributions are now accepted under
+  the Humanbound Contributor License Agreement (see `CLA.md`) so the project
+  can continue to evolve and be offered through commercial channels.
 - **Renamed package**: `hb-firewall` → `humanbound-firewall`. The old name
   remains on PyPI as a transitional meta-package through at least 2026-06-20,
   emitting a `DeprecationWarning` on import.
@@ -31,8 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `torch` / `transformers` / `openai` / `anthropic` / `google-generativeai`
   now raises an `ImportError` telling the user which extra to install.
 - **OSS hygiene documents**: `SECURITY.md`, `CODE_OF_CONDUCT.md`,
-  `CONTRIBUTING.md`, `CLA.md`, `COMMERCIAL.md`, `TRADEMARK.md`,
-  `ROADMAP.md`.
+  `CONTRIBUTING.md`, `CLA.md`, `TRADEMARK.md`, `ROADMAP.md`.
 - **GitHub automation**: CI matrix (Python 3.10 / 3.11 / 3.12), release
   workflow with PyPI Trusted Publishing (OIDC) and sigstore attestations,
   issue/PR templates, dependabot, CLAAssistant configuration.

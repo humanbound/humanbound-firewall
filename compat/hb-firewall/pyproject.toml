@@ -7,7 +7,7 @@ name = "hb-firewall"
 version = "0.2.0"
 description = "DEPRECATED: renamed to humanbound-firewall"
 readme = "README.md"
-license = "AGPL-3.0-only"
+license = "Apache-2.0"
 requires-python = ">=3.10"
 authors = [
     {name = "Humanbound", email = "hello@humanbound.ai"},

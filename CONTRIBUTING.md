@@ -31,14 +31,16 @@ the private disclosure channel.
 
 ## Contributor License Agreement (CLA) — required
 
-Because `humanbound-firewall` is dual-licensed (AGPL-3.0 + commercial — see
-[COMMERCIAL.md](./COMMERCIAL.md)), every external contribution must be covered
-by a Contributor License Agreement. The [CLA](./CLA.md) grants Humanbound the
-rights needed to offer the software under both licenses.
+Every external contribution must be covered by the
+[Humanbound Contributor License Agreement](./CLA.md). The CLA gives
+Humanbound the operational flexibility to evolve the project (including
+offering managed services on the Humanbound Platform) while preserving Your
+right to use Your own contributions elsewhere and Your authorship in the
+project's git history.
 
-The first time you open a pull request, the CLAAssistant bot will comment with
-a one-line instruction to sign. Sign once and all your future contributions are
-covered.
+The first time you open a pull request, the CLAAssistant bot will comment
+with a one-line instruction to sign. Sign once and all your future
+contributions are covered.
 
 ## Change workflow
 
@@ -55,7 +57,7 @@ covered.
 - Type checker: `mypy` (see `pyproject.toml` for configuration)
 - Every new `.py` file gets the SPDX header:
   ```
-  # SPDX-License-Identifier: AGPL-3.0-only
+  # SPDX-License-Identifier: Apache-2.0
   # Copyright (c) 2024-2026 Humanbound
   ```
 

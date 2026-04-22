@@ -36,8 +36,8 @@ The authoritative, continuously-updated roadmap lives at
   scoped to prompt-injection / jailbreak / agent-scope-violation defense
 - Not offering hosted inference — Humanbound's commercial platform offers
   that separately; the OSS package stays local-first
-- Not shipping pre-trained weights under AGPL — models require separate
-  licensing and ship via model hubs or the commercial product
+- Not shipping pre-trained weights with the source — models require separate
+  licensing and ship via model hubs or the managed Humanbound Firewall service
 
 ## Release cadence
 

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2024-2026 Humanbound
 """Focused tests for AttackDetector, AttackDetectorEnsemble, and the
 conversation-parsing paths inside Firewall that aren't reached by the

@@ -26,7 +26,7 @@
   <a href="https://pypi.org/project/humanbound-firewall/"><img src="https://img.shields.io/pypi/pyversions/humanbound-firewall?style=flat-square&color=FD9506" alt="Python versions"/></a>
   <a href="https://pypi.org/project/humanbound-firewall/"><img src="https://img.shields.io/pypi/dm/humanbound-firewall?style=flat-square&color=FD9506" alt="Downloads"/></a>
   <a href="https://github.com/humanbound/humanbound-firewall/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/humanbound/humanbound-firewall/ci.yml?style=flat-square&color=FD9506" alt="CI"/></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-FD9506?style=flat-square" alt="License"/></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-FD9506?style=flat-square" alt="License"/></a>
   <a href="https://discord.gg/gQyXjVBF"><img src="https://img.shields.io/badge/discord-community-FD9506?style=flat-square" alt="Discord"/></a>
   <a href="https://docs.humanbound.ai/defense/firewall/"><img src="https://img.shields.io/badge/docs-humanbound.ai-FD9506?style=flat-square" alt="Docs"/></a>
 </p>
@@ -135,7 +135,7 @@ integration walkthrough.
 
 Contributions welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the dev
 loop, release process, and CLA requirement (required because the firewall is
-dual-licensed AGPL + commercial — see [COMMERCIAL.md](./COMMERCIAL.md)).
+CLA required so the project can be offered through commercial channels — see [CLA.md](./CLA.md)).
 
 - 🐛 [Report a bug](https://github.com/humanbound/humanbound-firewall/issues/new/choose)
 - 💡 [Request a feature](https://github.com/humanbound/humanbound-firewall/issues/new/choose)
@@ -144,14 +144,13 @@ dual-licensed AGPL + commercial — see [COMMERCIAL.md](./COMMERCIAL.md)).
 
 ## License
 
-Dual-licensed — you choose:
+[Apache-2.0](./LICENSE). Free to use in any context — commercial or
+open-source — with attribution.
 
-- **[AGPL-3.0-only](./LICENSE)** — free to use, modify, and distribute. If you
-  run a modified version as a network service, you must open-source your
-  changes.
-- **[Commercial license](./COMMERCIAL.md)** — removes the AGPL obligations for
-  closed-source or proprietary deployments. Contact
-  [legal@humanbound.ai](mailto:legal@humanbound.ai).
+External contributions are accepted under the
+[Humanbound Contributor License Agreement](./CLA.md) so the project can
+continue to evolve and be offered through commercial channels (including the
+managed Humanbound Firewall service on the Humanbound Platform).
 
 See [TRADEMARK.md](./TRADEMARK.md) for the trademark policy. The code is open;
 the name is not.

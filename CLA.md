@@ -1,28 +1,16 @@
-# Humanbound Contributor License Agreement (v1.0 — DRAFT)
-
-> **⚠️ DRAFT — pending legal review.** This CLA is adapted from the Apache
-> Software Foundation Individual Contributor License Agreement v2.2 (see
-> [apache.org/licenses/icla.pdf](https://www.apache.org/licenses/icla.pdf)),
-> modified to name AI and Me Single-Member Private Company (Humanbound) as
-> grantee. **Do not activate the CLAAssistant bot on production contributions
-> until this document has been reviewed and approved by counsel.**
-
----
+# Humanbound Contributor License Agreement (v1.0)
 
 Thank you for your interest in contributing to `humanbound-firewall` (the
 "Project"), maintained by **AI and Me Single-Member Private Company** (also
 known as "Humanbound"), a private company incorporated in Greece (GEMI
-No. 163102829000; Tax ID 801775352; with registered seat at 11 Karaoli &
-Dimitriou Street, 45221 Ioannina, Greece), hereinafter referred to as
-"Humanbound" or "the Company."
+No. 163102829000; Tax ID 801775352; EU VAT EL801775352; with registered seat at
+11 Karaoli & Dimitriou Street, 45221 Ioannina, Greece), hereinafter referred to
+as "Humanbound" or "the Company."
 
-In order to clarify the intellectual-property rights granted with
-contributions from any person or entity, Humanbound must have a Contributor
-License Agreement ("Agreement") on file that has been signed by each
-Contributor, indicating agreement to the license terms below. This license is
-for your protection as a Contributor as well as the protection of Humanbound
-and its users. It does not change your rights to use your own Contributions
-for any other purpose.
+This Contributor License Agreement ("Agreement") clarifies the intellectual-
+property rights granted with contributions from any person or entity. It is
+adapted from the Apache Software Foundation Individual Contributor License
+Agreement v2.2 (see [apache.org/licenses/icla.pdf](https://www.apache.org/licenses/icla.pdf)).
 
 You accept and agree to the following terms and conditions for Your present
 and future Contributions submitted to Humanbound. Except for the license
@@ -116,11 +104,52 @@ complete details of its source and of any license or other restriction
 agreements) of which you are personally aware, and conspicuously marking
 the work as "Submitted on behalf of a third-party: [named here]".
 
-## 7. Change of circumstances
+## 7. Change of Circumstances
 
 You agree to notify Humanbound of any facts or circumstances of which you
 become aware that would make these representations inaccurate in any
 respect.
+
+## 8. Project Stewardship and Attribution
+
+**8.1 Project Evolution.** Humanbound is responsible for the long-term
+stewardship of the Project, which sometimes requires operational decisions
+about how, where, and under what terms it is distributed. Your Contributions
+are subject to those decisions. Specifically, Humanbound may at its
+discretion:
+
+  (a) change the repository's visibility (public, private, or archived) or
+      its hosting location;
+  (b) release future versions of the Project under a different license,
+      including a proprietary or source-available license;
+  (c) integrate Your Contributions into commercial products, managed
+      services, or hosted offerings;
+  (d) discontinue public distribution of the Project;
+  (e) transfer this Agreement and the rights granted hereunder to a
+      successor entity (for example, in the event of an acquisition or
+      corporate restructuring).
+
+These operational choices do not affect Your right to use Your own
+Contributions elsewhere, nor do they retroactively change the license of any
+already-released version: any public Apache-2.0 release remains permanently
+available under Apache-2.0. Humanbound's flexibility applies to the Project's
+future evolution and to Humanbound's own commercial use of the contributed
+work.
+
+**8.2 Attribution.** Humanbound will preserve Your authorship of
+Contributions in the Project's version control history (e.g., git commit
+metadata), and welcomes You to reference Your Contributions in personal
+portfolios, talks, and publications. Beyond git history, Humanbound is not
+obliged to attribute You in product interfaces, marketing, or documentation,
+though it may do so as a matter of good practice.
+
+**8.3 Moral Rights.** The grants in Sections 2 and 3 are intended to give
+Humanbound the commercial flexibility described above. To make those grants
+effective across jurisdictions, You agree not to invoke any moral rights You
+may retain (such as rights of integrity or attribution beyond git history)
+in a way that would restrict Humanbound's use of Your Contributions. Where
+applicable law does not permit a full waiver, this clause operates as a
+covenant not to sue.
 
 ## Corporate CLA
 
@@ -130,7 +159,7 @@ a Corporate Contributor License Agreement (CCLA) is available by contacting
 authorized signer to cover all contributions from a named list of
 individuals.
 
-## Governing law
+## Governing Law
 
 This Agreement is governed by the laws of Greece. Any disputes arising out
 of or in connection with this Agreement shall be subject to the exclusive
@@ -138,6 +167,6 @@ jurisdiction of the Courts of Athens.
 
 ---
 
-_Adapted from the Apache Software Foundation Individual Contributor License
+*Adapted from the Apache Software Foundation Individual Contributor License
 Agreement v2.2 with permission. The Humanbound CLA is made available under
-the same terms as the original._
+the same terms as the original.*

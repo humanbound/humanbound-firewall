@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-only
+# SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2024-2026 Humanbound
 """DEPRECATED: hb-firewall has been renamed to humanbound-firewall.
 

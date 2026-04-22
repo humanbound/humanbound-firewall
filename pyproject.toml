@@ -7,7 +7,7 @@ name = "humanbound-firewall"
 version = "0.2.0"
 description = "Multi-tier firewall for AI agents — prompt injection, jailbreak, and scope violation protection"
 readme = "README.md"
-license = "AGPL-3.0-only"
+license = "Apache-2.0"
 requires-python = ">=3.10"
 authors = [
     {name = "Humanbound", email = "hello@humanbound.ai"},
