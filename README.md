@@ -154,9 +154,3 @@ managed Humanbound Firewall service on the Humanbound Platform).
 
 See [TRADEMARK.md](./TRADEMARK.md) for the trademark policy. The code is open;
 the name is not.
-
----
-
-<p align="center">
-  <sub><em>Humanbound is the trading name of AI and Me Single-Member Private Company, incorporated in Greece.</em></sub>
-</p>
