@@ -23,6 +23,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Topic :: Scientific/Engineering :: Artificial Intelligence` classifiers, and a
   `Discord` entry in `[project.urls]` so PyPI shows the community link in the sidebar.
 
+### Changed
+- **README refresh**: quick start now leads with the code (Tiers 0–2 run
+  locally and free; provider env vars only needed for the Tier 3 LLM Judge),
+  and the CLI section is reframed as "Train guardrails from your test
+  results". Contributing/CLA wording cleaned up.
+- Package summary now reads "Multi-tier firewall for AI agents — blocks prompt
+  injections, jailbreaks, and scope violations with sub-millisecond latency
+  for most requests."
+
 ## [0.2.1] — 2026-05-12
 
 ### Fixed
