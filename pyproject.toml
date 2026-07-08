@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "humanbound-firewall"
-version = "0.2.1"
-description = "Multi-tier firewall for AI agents — prompt injection, jailbreak, and scope violation protection"
+version = "0.2.2"
+description = "Multi-tier firewall for AI agents — blocks prompt injections, jailbreaks, and scope violations with sub-millisecond latency for most requests"
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"
@@ -36,6 +36,8 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Security",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Typing :: Typed",
@@ -84,6 +86,7 @@ Repository = "https://github.com/humanbound/humanbound-firewall"
 Issues = "https://github.com/humanbound/humanbound-firewall/issues"
 Changelog = "https://github.com/humanbound/humanbound-firewall/blob/main/CHANGELOG.md"
 Community = "https://docs.humanbound.ai/community/"
+Discord = "https://discord.gg/WgTMpmSFtN"
 
 [tool.setuptools.packages.find]
 where = ["src"]

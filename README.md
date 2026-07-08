@@ -1,17 +1,13 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-light.svg"/>
-    <source media="(prefers-color-scheme: light)" srcset="assets/logo-dark.svg"/>
-    <img src="assets/logo-dark.svg" alt="Humanbound" width="280"/>
-  </picture>
+  <img src="https://raw.githubusercontent.com/humanbound/humanbound-firewall/main/assets/logo-dark.svg" alt="Humanbound" width="280"/>
 </p>
 
 <h3 align="center">humanbound-firewall</h3>
 
 <p align="center">
-  Multi-tier firewall for AI agents — blocks prompt injections, jailbreaks, and scope violations with sub-millisecond latency for most requests.
+  Multi-tier firewall for AI agents. Blocks prompt injections, jailbreaks, and scope violations with sub-millisecond latency for most requests.
   <br/>
-  <strong>4-tier architecture</strong> &middot; <strong>pluggable models</strong> &middot; <strong>trains from your test data</strong>
+  <strong>4-tier architecture</strong> &middot; <strong>pluggable models</strong> &middot; <strong>guardrails trained from your own test data</strong>
 </p>
 
 <p align="center">
@@ -27,8 +23,8 @@
   <a href="https://pypi.org/project/humanbound-firewall/"><img src="https://img.shields.io/pypi/pyversions/humanbound-firewall?style=flat-square&color=FD9506" alt="Python versions"/></a>
   <a href="https://pypi.org/project/humanbound-firewall/"><img src="https://img.shields.io/pypi/dm/humanbound-firewall?style=flat-square&color=FD9506" alt="Downloads"/></a>
   <a href="https://github.com/humanbound/humanbound-firewall/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/humanbound/humanbound-firewall/ci.yml?style=flat-square&color=FD9506" alt="CI"/></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-FD9506?style=flat-square" alt="License"/></a>
-  <a href="https://discord.gg/gQyXjVBF"><img src="https://img.shields.io/badge/discord-community-FD9506?style=flat-square" alt="Discord"/></a>
+  <a href="https://github.com/humanbound/humanbound-firewall/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-FD9506?style=flat-square" alt="License"/></a>
+  <a href="https://discord.gg/WgTMpmSFtN"><img src="https://img.shields.io/badge/discord-community-FD9506?style=flat-square" alt="Discord"/></a>
   <a href="https://docs.humanbound.ai/defense/firewall/"><img src="https://img.shields.io/badge/docs-humanbound.ai-FD9506?style=flat-square" alt="Docs"/></a>
 </p>
 
@@ -83,10 +79,8 @@ Optional per-provider extras: `[openai]`, `[anthropic]`, `[gemini]`.
 
 ### Basic Usage
 
-```bash
-export HUMANBOUND_FIREWALL_PROVIDER=openai
-export HUMANBOUND_FIREWALL_API_KEY=sk-...
-```
+Tiers 0–2 run locally and free. No API key is needed until you enable the
+Tier 3 LLM Judge.
 
 ```python
 from humanbound_firewall import Firewall
@@ -114,6 +108,13 @@ else:
     response = your_agent.handle(result.prompt)
 ```
 
+To enable the Tier 3 LLM Judge, set a provider:
+
+```bash
+export HUMANBOUND_FIREWALL_PROVIDER=openai
+export HUMANBOUND_FIREWALL_API_KEY=sk-...
+```
+
 Pass your existing conversation array — no session management, no preprocessing.
 The firewall extracts the last user message as the prompt and uses prior turns
 as context. Each tier manages its own context window internally.
@@ -122,10 +123,11 @@ Full config reference, tier-by-tier deep dive, training your own Tier 2 model,
 writing custom detectors, `.hbfw` model format, and API reference all live in
 the [firewall docs](https://docs.humanbound.ai/defense/firewall/).
 
-## Using with the Humanbound CLI
+## Train guardrails from your test results
 
 Train Tier 2 classifiers from your Humanbound adversarial and QA test results
-using the [Humanbound CLI](https://github.com/humanbound/humanbound):
+using the [Humanbound CLI](https://github.com/humanbound/humanbound). Test your
+agent, then deploy defenses trained on exactly the attacks it failed:
 
 ```bash
 pip install humanbound[firewall]   # installs both packages together
@@ -139,24 +141,21 @@ integration walkthrough.
 
 ## Contributing
 
-Contributions welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the dev
-loop, release process, and CLA requirement (required because the firewall is
-CLA required so the project can be offered through commercial channels — see [CLA.md](./CLA.md)).
+Contributions welcome. See [CONTRIBUTING.md](https://github.com/humanbound/humanbound-firewall/blob/main/CONTRIBUTING.md)
+for the dev loop and release process. External contributions require signing
+the [Contributor License Agreement](https://github.com/humanbound/humanbound-firewall/blob/main/CLA.md),
+which lets the project be offered through commercial channels, including the
+managed Humanbound Firewall service on the Humanbound Platform.
 
 - 🐛 [Report a bug](https://github.com/humanbound/humanbound-firewall/issues/new/choose)
 - 💡 [Request a feature](https://github.com/humanbound/humanbound-firewall/issues/new/choose)
-- 🔒 [Report a security issue](./SECURITY.md) — **not via public Issues**
-- 💬 [Join Discord](https://discord.gg/gQyXjVBF)
+- 🔒 [Report a security issue](https://github.com/humanbound/humanbound-firewall/blob/main/SECURITY.md) — **not via public Issues**
+- 💬 [Join Discord](https://discord.gg/WgTMpmSFtN)
 
 ## License
 
-[Apache-2.0](./LICENSE). Free to use in any context — commercial or
+[Apache-2.0](https://github.com/humanbound/humanbound-firewall/blob/main/LICENSE). Free to use in any context — commercial or
 open-source — with attribution.
 
-External contributions are accepted under the
-[Humanbound Contributor License Agreement](./CLA.md) so the project can
-continue to evolve and be offered through commercial channels (including the
-managed Humanbound Firewall service on the Humanbound Platform).
-
-See [TRADEMARK.md](./TRADEMARK.md) for the trademark policy. The code is open;
+See [TRADEMARK.md](https://github.com/humanbound/humanbound-firewall/blob/main/TRADEMARK.md) for the trademark policy. The code is open;
 the name is not.

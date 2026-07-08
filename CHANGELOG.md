@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] — 2026-07-08
+
+### Fixed
+- **PyPI listing**: replaced every repo-relative link in the README (CONTRIBUTING,
+  CLA, SECURITY, LICENSE, TRADEMARK) with absolute GitHub URLs — they returned 404
+  when rendered on pypi.org. Also fixed the garbled CLA sentence in the
+  Contributing section.
+- **PyPI logo**: the `<picture>` theme-switching block is stripped by PyPI's HTML
+  sanitizer, leaving a broken relative image. The README now uses a single absolute
+  `<img>` pointing at the self-contained logo variant that reads on both PyPI themes.
+
+### Added
+- Package metadata: `Programming Language :: Python :: 3.13` and
+  `Topic :: Scientific/Engineering :: Artificial Intelligence` classifiers, and a
+  `Discord` entry in `[project.urls]` so PyPI shows the community link in the sidebar.
+
+### Changed
+- **README refresh**: quick start now leads with the code (Tiers 0–2 run
+  locally and free; provider env vars only needed for the Tier 3 LLM Judge),
+  and the CLI section is reframed as "Train guardrails from your test
+  results". Contributing/CLA wording cleaned up.
+- Package summary now reads "Multi-tier firewall for AI agents — blocks prompt
+  injections, jailbreaks, and scope violations with sub-millisecond latency
+  for most requests."
+
 ## [0.2.1] — 2026-05-12
 
 ### Fixed
