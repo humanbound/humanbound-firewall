@@ -5,7 +5,7 @@
 <h3 align="center">humanbound-firewall</h3>
 
 <p align="center">
-  Multi-tier firewall for AI agents. Blocks prompt injections, jailbreaks, and scope violations with sub-millisecond latency for most requests.
+  Multi-tier firewall for AI agents. Blocks prompt injections, jailbreaks, and scope violations — fast local tiers screen every request; only the uncertain ones reach an LLM judge.
   <br/>
   <strong>4-tier architecture</strong> &middot; <strong>pluggable models</strong> &middot; <strong>guardrails trained from your own test data</strong>
 </p>
@@ -45,22 +45,22 @@ Every user message passes through four tiers before reaching your agent:
 ```
 User Input
     |
-[ Tier 0 ]  Sanitization                    ~0ms, free
+[ Tier 0 ]  Sanitization                    no model call, free
     |        Strips invisible control characters, zero-width joiners, bidi overrides.
     |
-[ Tier 1 ]  Basic Attack Detection          ~15-50ms, free
+[ Tier 1 ]  Basic Attack Detection          local model inference, free
     |        Pre-trained models (DeBERTa, Azure Content Safety, Lakera, etc.)
     |        Pluggable ensemble — add models or APIs, configure consensus.
-    |        Catches ~85% of prompt injections out of the box.
+    |        Catches the bulk of generic prompt injections out of the box.
     |
-[ Tier 2 ]  Agent-Specific Classification   ~10ms, free
+[ Tier 2 ]  Agent-Specific Classification   local model inference, free
     |        Trained on YOUR agent's adversarial test logs and QA data.
     |        Catches attacks Tier 1 misses. Fast-tracks legitimate requests.
     |        You provide the model — we provide the training orchestrator.
     |
-[ Tier 3 ]  LLM Judge                       ~1-2s, token cost
+[ Tier 3 ]  LLM Judge                       LLM call, token cost
              Deep contextual analysis against your agent's security policy.
-             Only called when Tiers 1-2 are uncertain (~10-15% of traffic).
+             Only called when Tiers 1-2 are uncertain — a small fraction of traffic.
 ```
 
 Each tier either makes a confident decision or escalates. No forced decisions.
