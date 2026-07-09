@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.2.2] — 2026-07-09
 
+### Removed
+- **`hb-firewall` transitional stub retired.** All `hb-firewall` releases on
+  PyPI were yanked on 2026-07-09 (past the 2026-06-20 transition window
+  announced in 0.2.0), with the yank reason pointing users to
+  `pip install humanbound-firewall`. The stub sources (`compat/hb-firewall`)
+  and its `build-stub` / `publish-stub` release-workflow jobs are removed, so
+  future releases no longer publish the deprecated package.
+
 ### Fixed
 - **PyPI listing**: replaced every repo-relative link in the README (CONTRIBUTING,
   CLA, SECURITY, LICENSE, TRADEMARK) with absolute GitHub URLs — they returned 404
