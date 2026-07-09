@@ -28,9 +28,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   locally and free; provider env vars only needed for the Tier 3 LLM Judge),
   and the CLI section is reframed as "Train guardrails from your test
   results". Contributing/CLA wording cleaned up.
+- **Removed unsourced performance claims** from the README tagline, tier
+  diagram, and package summary ("sub-millisecond latency", per-tier timings,
+  "~85% of prompt injections", "~10-15% of traffic"). Until we publish
+  benchmarks, performance language is qualitative and architecture-grounded
+  only: local tiers are free with no LLM call; the Tier 3 judge is the only
+  tier with token cost and is invoked only on escalation.
 - Package summary now reads "Multi-tier firewall for AI agents — blocks prompt
-  injections, jailbreaks, and scope violations with sub-millisecond latency
-  for most requests."
+  injections, jailbreaks, and scope violations; fast local tiers screen every
+  request, only uncertain cases reach an LLM judge."
 
 ## [0.2.1] — 2026-05-12
 
