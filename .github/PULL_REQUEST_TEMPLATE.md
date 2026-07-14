@@ -19,7 +19,7 @@
 - [ ] `pytest`, `ruff check`, and `ruff format --check` pass locally
 - [ ] `CHANGELOG.md` updated under `[Unreleased]`
 - [ ] Docs updated on `docs.humanbound.ai` (if the change is user-visible)
-- [ ] I have signed the [CLA](https://github.com/humanbound/humanbound-firewall/blob/main/CLA.md) (the bot will guide you if not)
+- [ ] All commits are signed off (`git commit -s`) — see [DCO.md](https://github.com/humanbound/humanbound-firewall/blob/main/DCO.md)
 
 ## Linked issue(s)
 
