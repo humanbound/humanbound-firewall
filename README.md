@@ -142,10 +142,10 @@ integration walkthrough.
 ## Contributing
 
 Contributions welcome. See [CONTRIBUTING.md](https://github.com/humanbound/humanbound-firewall/blob/main/CONTRIBUTING.md)
-for the dev loop and release process. External contributions require signing
-the [Contributor License Agreement](https://github.com/humanbound/humanbound-firewall/blob/main/CLA.md),
-which lets the project be offered through commercial channels, including the
-managed Humanbound Firewall service on the Humanbound Platform.
+for the dev loop and release process. Contributions are accepted under the
+[Developer Certificate of Origin](https://github.com/humanbound/humanbound-firewall/blob/main/DCO.md)
+(sign your commits with `git commit -s`) — no CLA to sign; you keep the
+copyright to your work under the same Apache-2.0 license as the project.
 
 - 🐛 [Report a bug](https://github.com/humanbound/humanbound-firewall/issues/new/choose)
 - 💡 [Request a feature](https://github.com/humanbound/humanbound-firewall/issues/new/choose)
