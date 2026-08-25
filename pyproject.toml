@@ -86,7 +86,7 @@ Repository = "https://github.com/humanbound/humanbound-firewall"
 Issues = "https://github.com/humanbound/humanbound-firewall/issues"
 Changelog = "https://github.com/humanbound/humanbound-firewall/blob/main/CHANGELOG.md"
 Community = "https://docs.humanbound.ai/community/"
-Discord = "https://discord.gg/WgTMpmSFtN"
+Discord = "https://discord.gg/QFTD6tr9zu"
 
 [tool.setuptools.packages.find]
 where = ["src"]
