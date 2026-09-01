@@ -23,9 +23,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   which no longer resolves; `README.md` and `pyproject.toml` used a live but
   different invite. All four now use `discord.gg/QFTD6tr9zu`, matching
   www.humanbound.ai. The PyPI sidebar link updates on the next release.
+- `LICENSE` restored to the verbatim Apache-2.0 text. Sections 6 and 9 had
+  diverged from the canonical wording and the appendix was missing; the file
+  now matches apache.org/licenses/LICENSE-2.0 exactly, apart from the
+  appendix copyright line. The license grant is unchanged — the project was
+  and remains Apache-2.0.
 
 ### Added
 - `NOTICE` file per Apache-2.0 section 4(d).
+
+### Security
+- Pinned every GitHub Action used in the workflows to a full commit SHA
+  (with a version comment), so a moved tag cannot inject code between
+  Dependabot updates. `pypa/gh-action-pypi-publish` had been tracking
+  `release/v1` — a branch — in the job that holds PyPI publishing rights.
+  No action changed version: each SHA is what its tag resolved to at the
+  time of the change.
 
 ## [0.2.2] — 2026-07-09
 
