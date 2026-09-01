@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CONTRIBUTING.md` gains an explicit third-party license policy: vendored
   code must be permissively licensed (Apache-2.0/MIT/BSD/ISC); GPL, AGPL,
   SSPL, and BSL code cannot be accepted.
+- **Discord links now point at the `#start-here` invite** (#19).
+  `CONTRIBUTING.md` and the new-issue chooser linked `discord.gg/gQyXjVBF`,
+  which no longer resolves; `README.md` and `pyproject.toml` used a live but
+  different invite. All four now use `discord.gg/QFTD6tr9zu`, matching
+  www.humanbound.ai. The PyPI sidebar link updates on the next release.
 - `LICENSE` restored to the verbatim Apache-2.0 text. Sections 6 and 9 had
   diverged from the canonical wording and the appendix was missing; the file
   now matches apache.org/licenses/LICENSE-2.0 exactly, apart from the
