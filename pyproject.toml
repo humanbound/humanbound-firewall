@@ -71,7 +71,7 @@ dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
     "pytest-timeout>=2.3",
-    "ruff>=0.6",
+    "ruff==0.16.1",
     "mypy>=1.11",
     "build>=1.2",
     "twine>=5.0",
@@ -86,7 +86,7 @@ Repository = "https://github.com/humanbound/humanbound-firewall"
 Issues = "https://github.com/humanbound/humanbound-firewall/issues"
 Changelog = "https://github.com/humanbound/humanbound-firewall/blob/main/CHANGELOG.md"
 Community = "https://docs.humanbound.ai/community/"
-Discord = "https://discord.gg/WgTMpmSFtN"
+Discord = "https://discord.gg/QFTD6tr9zu"
 
 [tool.setuptools.packages.find]
 where = ["src"]

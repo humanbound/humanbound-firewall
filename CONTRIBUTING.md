@@ -108,7 +108,7 @@ for the current cadence and supported-version matrix.
 
 ## Community
 
-- **Discord** — [discord.gg/gQyXjVBF](https://discord.gg/gQyXjVBF) for questions
+- **Discord** — [discord.gg/QFTD6tr9zu](https://discord.gg/QFTD6tr9zu) for questions
   and discussion
 - **Discussions** — on the GitHub repo, for longer-form topics
 - **Docs** — [docs.humanbound.ai](https://docs.humanbound.ai)
