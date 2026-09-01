@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CONTRIBUTING.md` gains an explicit third-party license policy: vendored
   code must be permissively licensed (Apache-2.0/MIT/BSD/ISC); GPL, AGPL,
   SSPL, and BSL code cannot be accepted.
+- `LICENSE` restored to the verbatim Apache-2.0 text. Sections 6 and 9 had
+  diverged from the canonical wording and the appendix was missing; the file
+  now matches apache.org/licenses/LICENSE-2.0 exactly, apart from the
+  appendix copyright line. The license grant is unchanged — the project was
+  and remains Apache-2.0.
 
 ### Added
 - `NOTICE` file per Apache-2.0 section 4(d).
