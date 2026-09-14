@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "humanbound-firewall"
-version = "0.2.2"
+version = "0.2.3"
 description = "Multi-tier firewall for AI agents — blocks prompt injections, jailbreaks, and scope violations; fast local tiers screen every request, only uncertain cases reach an LLM judge"
 readme = "README.md"
 license = "Apache-2.0"
