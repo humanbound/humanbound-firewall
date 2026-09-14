@@ -32,7 +32,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `NOTICE` file per Apache-2.0 section 4(d).
 
+### Fixed
+- `__version__` in `humanbound_firewall/__init__.py` read `0.2.1` while
+  `pyproject.toml` declared `0.2.2`, so the installed package misreported
+  its own version. Both now agree.
+
 ### Security
+- **`.hbfw` files can no longer execute code on load.** `load_hbfw()` used
+  `numpy.load(..., allow_pickle=True)`, so a crafted model ran arbitrary code
+  on load — before the Tier 2 detector-script check. Loading is now
+  `allow_pickle=False`. No legitimate model is affected (weights are numeric
+  arrays, strings, or `np.void` blobs); only object-dtype arrays are rejected.
+- **Arbitrary file write via the reference detector's manifest.**
+  `detectors/setfit_classifier.py` wrote manifest files under a temp dir
+  without constraint, so an absolute path or `..` escaped it. Absolute and
+  escaping paths are now rejected.
 - Pinned every GitHub Action used in the workflows to a full commit SHA
   (with a version comment), so a moved tag cannot inject code between
   Dependabot updates. `pypa/gh-action-pypi-publish` had been tracking
