@@ -562,5 +562,5 @@ def load_hbfw(path):
         with zf.open("config.json") as f:
             config = json.loads(f.read())
         with zf.open("weights.npz") as f:
-            weights = dict(np.load(f, allow_pickle=True))
+            weights = dict(np.load(f, allow_pickle=False))
     return config, weights
