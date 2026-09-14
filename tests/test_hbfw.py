@@ -556,3 +556,112 @@ class TestSetFitIntegration:
         assert "f1" in atk.metrics
         assert "val_samples" in atk.metrics
         assert atk.metrics["val_samples"] > 0
+
+
+# ---------------------------------------------------------------------------
+# Security regressions
+# ---------------------------------------------------------------------------
+
+
+class TestSecurity:
+    """Regression tests for the .hbfw load-time RCE and path traversal."""
+
+    def _write_object_array_hbfw(self, path, marker):
+        """Build a malicious .hbfw with stdlib only (no numpy on the attacker
+        side): a weights.npz whose one member is an object-dtype .npy, i.e. a
+        raw pickle stream that runs code when unpickled."""
+        import io
+        import os
+        import pickle
+        import struct
+        import zipfile
+
+        class _Evil:
+            def __reduce__(self):
+                return (os.system, (f"touch {marker}",))
+
+        header = "{'descr': '|O', 'fortran_order': False, 'shape': (1,), }"
+        prefix = 6 + 2 + 2
+        pad = (64 - ((prefix + len(header) + 1) % 64)) % 64
+        header = header + (" " * pad) + "\n"
+        npy = (
+            b"\x93NUMPY"
+            + bytes([1, 0])
+            + struct.pack("<H", len(header))
+            + header.encode("latin1")
+            + pickle.dumps([_Evil()], protocol=2)
+        )
+
+        npz_buf = io.BytesIO()
+        with zipfile.ZipFile(npz_buf, "w", zipfile.ZIP_STORED) as z:
+            z.writestr("attack_weights.npy", npy)
+
+        with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("config.json", '{"version": "2.0", "performance": {}}')
+            zf.writestr("weights.npz", npz_buf.getvalue())
+
+    def test_load_hbfw_rejects_object_array_and_runs_no_code(self):
+        pytest.importorskip("numpy")
+        with tempfile.TemporaryDirectory() as d:
+            evil = os.path.join(d, "evil.hbfw")
+            marker = os.path.join(d, "pwned")
+            self._write_object_array_hbfw(evil, marker)
+
+            with pytest.raises(ValueError):
+                load_hbfw(evil)
+
+            assert not os.path.exists(marker), "payload executed on load — RCE not fixed"
+
+    def test_load_hbfw_accepts_void_and_unicode(self):
+        """The format legitimate detectors use (unicode + np.void) still loads."""
+        np = pytest.importorskip("numpy")
+        weights = {
+            "setfit_manifest": '["model_head.pkl"]',
+            "setfit_model_name": "some/model",
+            "setfit_file_model_head_pkl": np.void(b"\x00\x01binary\xff"),
+        }
+        with tempfile.NamedTemporaryFile(suffix=".hbfw", delete=False) as f:
+            path = f.name
+        try:
+            save_hbfw({"config": {"version": "2.0", "performance": {}}, "weights": weights}, path)
+            _, loaded = load_hbfw(path)
+            assert bytes(loaded["setfit_file_model_head_pkl"]) == b"\x00\x01binary\xff"
+            assert str(loaded["setfit_model_name"]) == "some/model"
+        finally:
+            os.unlink(path)
+
+    @pytest.mark.parametrize("rel_path", ["../ESCAPED.txt", "/tmp/ABSOLUTE_hbfw_escape.txt"])
+    def test_setfit_load_weights_rejects_traversal(self, rel_path, monkeypatch):
+        """The reference detector must not write outside its temp model dir."""
+        import sys
+        import types
+
+        # Stub the two heavy third-party imports that run before the write loop;
+        # neither is touched by the loop the test exercises.
+        setfit_stub = types.ModuleType("setfit")
+        setfit_stub.SetFitModel = type(
+            "SetFitModel",
+            (),
+            {
+                "from_pretrained": staticmethod(
+                    lambda d: (_ for _ in ()).throw(RuntimeError("stub"))
+                )
+            },
+        )
+        monkeypatch.setitem(sys.modules, "setfit", setfit_stub)
+
+        cls = load_model_class(DETECTOR_SCRIPT)
+        # _patch_compat is a module-level function in the detector script; neutralize
+        # it via the method's own globals (the module isn't registered in sys.modules).
+        cls.load_weights.__globals__["_patch_compat"] = lambda: None
+
+        safe_key = "setfit_file_" + rel_path.replace("/", "__").replace(".", "_")
+        weights = {"setfit_manifest": f'["{rel_path}"]', safe_key: b"x"}
+
+        inst = cls("attack")
+        escaped = "/tmp/ABSOLUTE_hbfw_escape.txt"
+        if os.path.exists(escaped):
+            os.unlink(escaped)
+        with pytest.raises(ValueError, match="[Uu]nsafe path"):
+            inst.load_weights(weights)
+        assert not os.path.exists(escaped), "absolute-path write escaped the model dir"
