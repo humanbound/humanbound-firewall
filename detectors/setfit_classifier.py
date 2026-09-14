@@ -155,7 +155,11 @@ class AgentClassifier:
             if safe_key not in weights:
                 continue
 
-            fpath = os.path.join(model_dir, rel_path)
+            fpath = os.path.normpath(os.path.join(model_dir, rel_path))
+            if os.path.isabs(rel_path) or not (
+                fpath == model_dir or fpath.startswith(model_dir + os.sep)
+            ):
+                raise ValueError(f"Unsafe path in model manifest: {rel_path!r}")
             os.makedirs(os.path.dirname(fpath), exist_ok=True)
             with open(fpath, "wb") as f:
                 f.write(bytes(weights[safe_key]))
