@@ -6,7 +6,10 @@ from pathlib import Path
 
 import yaml
 
-from .models import AgentConfig
+from .models import CAPABILITIES, AgentConfig
+
+_TOOL_CLASSES = ("ingest", "recall")  # a tool's output is never a principal's request
+_FEW_SHOT_CLASSES = ("request", "ingest")  # the judges that learn from examples; recall takes none
 
 
 def load_config(path: str | Path) -> AgentConfig:
@@ -24,6 +27,8 @@ def load_config(path: str | Path) -> AgentConfig:
     scope = data.get("scope", {})
     intents = data.get("intents", {})
     settings = data.get("settings", {})
+    capabilities = _capabilities(data.get("capabilities"))
+    tool_classes, tool_expects = _tools(data.get("tools"))
 
     return AgentConfig(
         name=data.get("name", ""),
@@ -36,7 +41,70 @@ def load_config(path: str | Path) -> AgentConfig:
         mode=settings.get("mode", "block"),
         session_window=settings.get("session_window", 5),
         tier2_min_turns=settings.get("tier2_min_turns", 3),
-        risk_tolerance=settings.get("risk_tolerance", "medium"),
         temperature=settings.get("temperature", 0.0),
-        few_shots=data.get("few_shots", []),
+        few_shots=_few_shots(data.get("few_shots")),
+        capabilities=capabilities,
+        tool_classes=tool_classes,
+        tool_expects=tool_expects,
     )
+
+
+def _few_shots(raw) -> list[dict]:
+    """Few-shot examples, each tagged with the class it was learned on (default: request)."""
+    if not raw:
+        return []
+    if not isinstance(raw, list):
+        raise ValueError("few_shots must be a list of {prompt, verdict, category, class} entries")
+    out = []
+    for i, ex in enumerate(raw):
+        if not isinstance(ex, dict):
+            raise ValueError(f"few_shots[{i}] must be a mapping")
+        cls = ex.get("class") or "request"
+        if cls not in _FEW_SHOT_CLASSES:
+            raise ValueError(
+                f"few_shots[{i}].class = {cls!r}. Expected one of {_FEW_SHOT_CLASSES}; "
+                "the recall judge takes no examples."
+            )
+        out.append({**ex, "class": cls})
+    return out
+
+
+def _capabilities(raw) -> list[str]:
+    if raw is None:
+        return ["tools"]
+    if not isinstance(raw, list) or not all(isinstance(c, str) for c in raw):
+        raise ValueError("capabilities must be a list of names")
+    unknown = [c for c in raw if c not in CAPABILITIES]
+    if unknown:
+        raise ValueError(f"Unknown capabilities {unknown}. Expected a subset of {CAPABILITIES}.")
+    return list(raw)
+
+
+def _tools(raw) -> tuple[dict[str, str], dict[str, str]]:
+    """The optional `tools:` block: recall (a list), class (a mapping), expects (a mapping)."""
+    if raw is None:
+        return {}, {}
+    if not isinstance(raw, dict):
+        raise ValueError("tools must be a mapping with any of: recall, class, expects")
+    unknown = set(raw) - {"recall", "class", "expects"}
+    if unknown:
+        raise ValueError(f"Unknown keys under tools: {sorted(unknown)}")
+
+    recall = raw.get("recall") or []
+    if not isinstance(recall, list) or not all(isinstance(n, str) for n in recall):
+        raise ValueError("tools.recall must be a list of tool names")
+    classes = raw.get("class") or {}
+    if not isinstance(classes, dict):
+        raise ValueError("tools.class must map tool names to ingest | recall")
+    expects = raw.get("expects") or {}
+    if not isinstance(expects, dict):
+        raise ValueError("tools.expects must map tool names to a description")
+
+    tool_classes = dict.fromkeys(recall, "recall")
+    for name, cls in classes.items():
+        if cls not in _TOOL_CLASSES:
+            raise ValueError(f"tools.class[{name!r}] = {cls!r}. Expected one of {_TOOL_CLASSES}.")
+        if tool_classes.get(name, cls) != cls:
+            raise ValueError(f"Tool {name!r} is listed under recall and declared {cls!r}.")
+        tool_classes[name] = cls
+    return tool_classes, {str(k): str(v) for k, v in expects.items()}

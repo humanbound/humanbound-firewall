@@ -2,6 +2,7 @@
 # Copyright (c) 2024-2026 Humanbound
 """OpenAI provider."""
 
+import re
 import time
 from os import getenv
 
@@ -14,6 +15,35 @@ LLM_PING_TIMEOUT = 90
 DEFAULT_TEMPERATURE = 0
 
 OPENAI_CHAT_COMPLETION_ENDPOINT = "https://api.openai.com/v1/chat/completions"
+
+# Every chat model accepts `max_completion_tokens`; it is the deprecated `max_tokens` that
+# the reasoning families (gpt-5*, o-series, and whatever comes next) reject. So there is
+# no list of model names to keep up to date: the modern parameter is sent to every model.
+#
+# `max_completion_tokens` counts a reasoning model's hidden reasoning tokens as well as
+# its visible answer. With only the caller's visible budget, such a model can spend all
+# of it thinking and return nothing — for the judge, no verdict at all. So the reasoning
+# gets its own headroom on top of the visible budget; on a classic model the extra cap is
+# simply never reached.
+REASONING_TOKEN_HEADROOM = 8192
+
+# Reasoning models also reject a non-default `temperature`. Rather than guess which
+# models do, send it and retry without it once on that specific 400 — then remember, so
+# the wasted request happens once per model, not once per call.
+_TEMPERATURE_REJECTED = re.compile(r"temperature", re.I)
+_models_without_temperature: set = set()
+
+
+def _sampling_params(model: str, max_tokens: int, temperature: float) -> dict:
+    """The token-limit / temperature params to send. Works for any model, present or future."""
+    params: dict[str, float] = {"max_completion_tokens": max_tokens + REASONING_TOKEN_HEADROOM}
+    if model not in _models_without_temperature:
+        params["temperature"] = temperature
+    return params
+
+
+def _rejects_temperature(error_text: str) -> bool:
+    return bool(_TEMPERATURE_REJECTED.search(error_text or ""))
 
 
 class LLMStreamer:
@@ -33,17 +63,25 @@ class LLMStreamer:
         self, system_p, user_p, max_tokens=DEFAULT_MAX_OUT_TOKENS, temperature=DEFAULT_TEMPERATURE
     ):
         max_tokens = min(max_tokens, ALLOWED_MAX_OUT_TOKENS)
-        return self.__client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": system_p},
-                {"role": "user", "content": user_p},
-            ],
-            max_tokens=max_tokens,
-            temperature=temperature,
-            timeout=LLM_PING_TIMEOUT,
-            stream=True,
-        )
+        messages: list = [  # the SDK's typed message params; a plain list is what it accepts at runtime
+            {"role": "system", "content": system_p},
+            {"role": "user", "content": user_p},
+        ]
+        params = _sampling_params(self.model, max_tokens, temperature)
+        try:
+            return self.__client.chat.completions.create(
+                model=self.model, messages=messages, timeout=LLM_PING_TIMEOUT, stream=True, **params
+            )
+        except Exception as e:
+            if "temperature" not in params or not (
+                getattr(e, "status_code", None) == 400 and _rejects_temperature(str(e))
+            ):
+                raise
+            _models_without_temperature.add(self.model)
+            params.pop("temperature")
+            return self.__client.chat.completions.create(
+                model=self.model, messages=messages, timeout=LLM_PING_TIMEOUT, stream=True, **params
+            )
 
 
 class LLMPinger:
@@ -63,8 +101,7 @@ class LLMPinger:
                     {"role": "system", "content": system_p},
                     {"role": "user", "content": user_p},
                 ],
-                "max_tokens": max_tokens,
-                "temperature": temperature,
+                **_sampling_params(self._provider["integration"]["model"], max_tokens, temperature),
             },
             timeout=LLM_PING_TIMEOUT,
         )
@@ -92,6 +129,11 @@ class LLMPinger:
                     continue
                 raise Exception("502/Rate limit error.")
             elif resp.status_code == 400:
+                if self._provider["integration"][
+                    "model"
+                ] not in _models_without_temperature and _rejects_temperature(resp.text):
+                    _models_without_temperature.add(self._provider["integration"]["model"])
+                    continue  # retry once, now without temperature
                 raise Exception(f"502/Inappropriate content ({resp.text}).")
             else:
                 raise Exception(f"502/Error pinging LLM - {resp.status_code}/{resp.text}")

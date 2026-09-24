@@ -14,7 +14,6 @@ class Metrics:
         self._passed = 0
         self._blocked = 0
         self._review = 0
-        self._errors = 0
         self._by_category: dict[str, int] = {}
         self._latencies: list[int] = []
 
@@ -33,10 +32,6 @@ class Metrics:
     @property
     def review(self) -> int:
         return self._review
-
-    @property
-    def errors(self) -> int:
-        return self._errors
 
     @property
     def by_category(self) -> dict[str, int]:
@@ -84,12 +79,6 @@ class Metrics:
             if len(self._latencies) > 10000:
                 self._latencies = self._latencies[-5000:]
 
-    def record_error(self):
-        """Record an evaluation error."""
-        with self._lock:
-            self._total += 1
-            self._errors += 1
-
     def reset(self):
         """Reset all metrics."""
         with self._lock:
@@ -97,7 +86,6 @@ class Metrics:
             self._passed = 0
             self._blocked = 0
             self._review = 0
-            self._errors = 0
             self._by_category.clear()
             self._latencies.clear()
 
@@ -108,7 +96,6 @@ class Metrics:
             "passed": self._passed,
             "blocked": self._blocked,
             "review": self._review,
-            "errors": self._errors,
             "block_rate": self.block_rate,
             "avg_latency_ms": self.avg_latency_ms,
             "p99_latency_ms": self.p99_latency_ms,

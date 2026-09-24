@@ -23,7 +23,6 @@ settings:
   timeout: 5
   mode: block
   session_window: 5
-  risk_tolerance: medium
   temperature: 0
 
 few_shots:

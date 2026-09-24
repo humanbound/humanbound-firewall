@@ -15,15 +15,13 @@ class TestMetrics:
         assert m.blocked == 0
         assert m.avg_latency_ms == 0
 
-    def test_record_pass(self):
+    def test_record_pass_and_block(self):
         m = Metrics()
         m.record("pass", "", 100)
         assert m.total_evaluations == 1
         assert m.passed == 1
         assert m.blocked == 0
 
-    def test_record_block(self):
-        m = Metrics()
         m.record("block", "violation", 200)
         assert m.blocked == 1
         assert m.by_category == {"violation": 1}
@@ -57,9 +55,3 @@ class TestMetrics:
         assert d["total_evaluations"] == 1
         assert d["passed"] == 1
         assert "avg_latency_ms" in d
-
-    def test_error_tracking(self):
-        m = Metrics()
-        m.record_error()
-        assert m.errors == 1
-        assert m.total_evaluations == 1

@@ -17,12 +17,15 @@ from __future__ import annotations
 import sys
 from typing import TYPE_CHECKING
 
-__version__ = "0.2.3"
+__version__ = "0.3.0"
 
-from .models import VERDICT_MAP, AgentConfig, Category, EvalResult, Turn, Verdict
+from .models import CLASSES, VERDICT_MAP, AgentConfig, Category, EvalResult, Turn, Verdict
 
 _LAZY_ATTRS = {
     "Firewall": ".firewall",
+    "Guard": ".guard",
+    "Decision": ".guard",
+    "Session": ".session",
     "AttackDetector": ".firewall",
     "AttackDetectorEnsemble": ".firewall",
     "Provider": ".llm",
@@ -60,6 +63,7 @@ def __dir__():
 if TYPE_CHECKING:
     # Make the lazy names visible to static type checkers and IDEs.
     from .firewall import AttackDetector, AttackDetectorEnsemble, Firewall
+    from .guard import Decision, Guard
     from .hbfw import HBFW, load_hbfw, load_model_class, save_hbfw
     from .llm import (
         Provider,
@@ -68,10 +72,14 @@ if TYPE_CHECKING:
         get_llm_pinger,
         get_llm_streamer,
     )
+    from .session import Session
 
 
 __all__ = [
     "Firewall",
+    "Guard",
+    "Decision",
+    "Session",
     "AttackDetector",
     "AttackDetectorEnsemble",
     "EvalResult",
@@ -80,6 +88,7 @@ __all__ = [
     "Category",
     "Turn",
     "VERDICT_MAP",
+    "CLASSES",
     "Provider",
     "ProviderIntegration",
     "ProviderName",
