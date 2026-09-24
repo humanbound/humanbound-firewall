@@ -88,6 +88,13 @@ notice as the reply. The session travels in the graph state, so a checkpointer
 carries it across the runs of a thread. `firewall.adapt_to("langchain").report()`
 prints the agent's trust-boundary inventory.
 
+In `log` mode a verdict changes nothing the agent does, so the adapter does not
+wait for it: the result goes on at once and is judged in the background, in call
+order per thread, with the same verdicts and session a blocking run would give.
+Decisions reach `on_decision` as they land; the adapter's `flush(timeout)` waits
+for pending judgements (call it before a script exits), and
+`adapt_to("langchain", log_blocking=True)` makes log mode wait.
+
 ### Any agent: the manual tier
 
 `inspect()` is the same call the adapter makes. Use it wherever content enters
@@ -162,9 +169,9 @@ settings:
   timeout: 15
 ```
 
-`few_shots` entries — examples exported from your Humanbound test findings —
-carry the class they were learned on (`class: request | ingest`; the recall
-judge takes none).
+`few_shots` entries — attack examples learned from your findings — carry the
+class they were learned on (`class: request | ingest`; the recall judge takes
+none). Exporting them from the Humanbound CLI is not available yet.
 
 ## How It Works
 
@@ -200,18 +207,34 @@ Full config reference, tier-by-tier deep dive, training your own Tier 2 model,
 writing custom detectors, `.hbfw` model format, and API reference all live in
 the [firewall docs](https://docs.humanbound.ai/defense/firewall/).
 
-## Train guardrails from your test results
+## From your test results
 
-Train Tier 2 classifiers from your Humanbound adversarial and QA test results
-using the [Humanbound CLI](https://github.com/humanbound/humanbound). Test your
-agent, then deploy defenses trained on exactly the attacks it failed:
+The [Humanbound CLI](https://github.com/humanbound/humanbound) (2.10 or later)
+turns your test results into the firewall's inputs: the policy file the Tier 3
+judge reads, and a Tier 2 model trained on exactly the attacks your agent failed.
 
 ```bash
-pip install humanbound[firewall]   # installs both packages together
+pip install "humanbound[firewall]"          # installs both packages together
 hb login
-hb test                            # run adversarial tests
-hb firewall train                  # train a Tier 2 model from test logs
+hb test                                     # run adversarial tests
+
+# The policy file (agent.yaml): scope, intents, capabilities
+hb guardrails --format yaml -o agent.yaml
+
+# A Tier 2 model, with the SetFit detector from this repository
+pip install setfit
+mkdir -p detectors
+curl -o detectors/setfit_classifier.py \
+  https://raw.githubusercontent.com/humanbound/humanbound-firewall/v0.3.0/detectors/setfit_classifier.py
+hb firewall train --model detectors/setfit_classifier.py -o firewall.hbfw
 ```
+
+`hb firewall train` needs `--model`: the detector script is not part of the pip
+package. Keep it with your app — `Firewall.from_config("agent.yaml",
+model_path="firewall.hbfw", detector_script="detectors/setfit_classifier.py")`
+loads the trained model with it. Not logged in, `hb test` runs locally and
+`hb guardrails --format yaml` builds `agent.yaml` from the scope the test ran
+against.
 
 See [docs.humanbound.ai](https://docs.humanbound.ai) for the full CLI + firewall
 integration walkthrough.

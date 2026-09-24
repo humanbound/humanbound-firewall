@@ -76,9 +76,7 @@ intents:
 settings:
   timeout: 5
   mode: block
-  session_window: 5
   tier2_min_turns: 3
-  temperature: 0.0
 """)
 
 
