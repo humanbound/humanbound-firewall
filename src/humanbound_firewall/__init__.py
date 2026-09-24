@@ -102,5 +102,5 @@ __all__ = [
 
 # Backwards-compat shim: legacy imports (`import hb_firewall`) and legacy
 # pickled `.hbfw` models that reference the `hb_firewall.*` module path
-# continue to work. Scope: 0.2.x only — will be removed in 0.3.
+# continue to work. Kept through 0.3.x; removed in 0.4.
 sys.modules.setdefault("hb_firewall", sys.modules[__name__])

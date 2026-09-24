@@ -2,6 +2,7 @@
 # Copyright (c) 2024-2026 Humanbound
 """YAML configuration loader."""
 
+import warnings
 from pathlib import Path
 
 import yaml
@@ -10,6 +11,9 @@ from .models import CAPABILITIES, AgentConfig
 
 _TOOL_CLASSES = ("ingest", "recall")  # a tool's output is never a principal's request
 _FEW_SHOT_CLASSES = ("request", "ingest")  # the judges that learn from examples; recall takes none
+# Parsed for compatibility but never used: the judge runs at temperature 0 and sees every turn
+# it is given. Removed in 0.4.
+_UNUSED_SETTINGS = ("session_window", "temperature")
 
 
 def load_config(path: str | Path) -> AgentConfig:
@@ -27,6 +31,13 @@ def load_config(path: str | Path) -> AgentConfig:
     scope = data.get("scope", {})
     intents = data.get("intents", {})
     settings = data.get("settings", {})
+    for key in _UNUSED_SETTINGS:
+        if key in settings:
+            warnings.warn(
+                f"settings.{key} in {path} has no effect and will be removed in 0.4.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
     capabilities = _capabilities(data.get("capabilities"))
     tool_classes, tool_expects = _tools(data.get("tools"))
 

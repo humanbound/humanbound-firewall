@@ -114,9 +114,9 @@ class AgentConfig:
     # Settings
     timeout: int = 5
     mode: str = "block"  # block | log | passthrough
-    session_window: int = 5  # number of turns for context
+    session_window: int = 5  # unused; removed in 0.4
     tier2_min_turns: int = 3  # minimum turns before Tier 2 activates
-    temperature: float = 0.0
+    temperature: float = 0.0  # unused (the judge runs at 0); removed in 0.4
 
     # Few-shot examples
     few_shots: list[dict] = field(default_factory=list)
