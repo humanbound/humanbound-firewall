@@ -20,9 +20,6 @@ class TestConfigLoading:
         assert len(config.restricted_intents) == 5
         assert config.timeout == 5
         assert config.mode == "block"
-
-    def test_few_shots_loaded(self):
-        config = load_config(FIXTURES / "agent.yaml")
         assert len(config.few_shots) == 3
         assert config.few_shots[0]["verdict"] == "block"
 

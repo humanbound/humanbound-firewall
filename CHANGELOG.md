@@ -7,6 +7,108 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-09-24
+
+Every path into the model's context is a boundary. This release makes the
+firewall judge a payload by who authored it, adds a gateway that enforces the
+deployment's choices, a session the caller carries, and a LangChain adapter
+that attaches every boundary with two lines.
+
+### Added
+- **Trust classes.** `evaluate(..., cls=)` takes `request` (a principal's
+  turn), `ingest` (outside content: tool output, pages, documents,
+  sub-agents) or `recall` (the agent's own records coming back). A
+  conversation ending with a `{"role": "tool"}` message is ingest. `CLASSES`
+  is exported. Tier 3 gets one judge per class: `prompts/judge.txt` (request,
+  unchanged), `prompts/judge_ingest.txt` (untrusted data) and
+  `prompts/judge_recall.txt` (integrity). `Category.INTEGRITY` names a recall
+  block. Class-aware Tier 2 classifiers (`supports_class = True`) are
+  consulted for single-shot ingest and recall payloads; classifiers written
+  before trust classes are called exactly as before.
+- **`Firewall.inspect()` and `Guard`.** The gateway call: everything
+  `evaluate()` reports plus the action (`pass`, `withhold`, `reject`) and the
+  replacement text, with the deployment's choices applied. `from_config()`
+  and `Firewall()` take `classes`, `mode`, `mode_by_class`, `fail`
+  (`open` | `closed`), `on_decision` (observe-only) and `withheld_template`
+  (`{category}`, `{explanation}`, `{cls}`, `{boundary}`). An engine failure
+  is the agent's failure: `evaluate()` raises, `inspect()` resolves it by the
+  fail mode. `Decision` is exported.
+- **`Session`.** A pure, serialisable value the caller carries — token in,
+  token out — built from verdict-time facts only. `evaluate()` and
+  `inspect()` take `session=` and return the updated value; a block earlier
+  in the thread elevates the posture, which tightens a Tier 2 classifier that
+  exposes `tightened()` one notch. `Session.merge()` joins branches that
+  recorded in parallel.
+- **Policy file.** `capabilities` (the platform's vocabulary: `tools`,
+  `memory`, `inter_agent`, `reasoning_model`) and an optional whitebox
+  `tools:` block — `recall: [...]`, `class: {tool: ingest|recall}`,
+  `expects: {tool: "..."}` — that can only relax the default (every tool is
+  ingest). `AgentConfig.class_of(tool)`. `few_shots` entries carry the class
+  they were learned on (`class: request | ingest`, default `request`); the
+  recall judge takes none.
+- **`Firewall.adapt_to(framework)`** and a LangChain adapter
+  (`humanbound_firewall.integrations.langchain.HumanboundFirewallMiddleware`):
+  `before_agent` starts the run and pins the request, `before_model` judges
+  the human turn as `request`, `wrap_tool_call` judges every tool result as
+  `ingest` or `recall` per policy and replaces a withheld result with the
+  template notice, tool_call_id intact. The session lives in the graph state
+  under `humanbound_session` with a reducer for parallel tool calls.
+  `boundaries` is the trust-boundary inventory; `report()` prints it. Adapters
+  are imported lazily. A conformance test drives one scripted thread through
+  the manual tier and the adapter against the same fake engine.
+- **Log mode off the agent's path.** In log mode a verdict changes nothing the
+  agent does, so the LangChain adapter no longer waits for it: the tool result
+  (or the human turn) goes on at once and the same payload is judged in the
+  background, with the window, boundary and session captured at that moment.
+  A thread's background judgements run one at a time in call order, each on
+  the session the previous one produced, so verdicts and session match a
+  blocking run; threads are judged in parallel. Decisions reach `on_decision`
+  as they land; the session is written back at the next model turn and in
+  `after_agent`; `flush(timeout)` waits for pending judgements.
+  `adapt_to("langchain", log_blocking=True)` restores waiting. A tool
+  boundary now carries its `tool_call_id`.
+- **The boundary in the judge's context.** The ingest and recall judges
+  receive a BOUNDARY section — the tool's own description, the policy's
+  `expects`, and what the tool was called with — and use it generically.
+- `evaluate()` accepts `window=` (the recent transcript, OpenAI format) and
+  `boundary=` alongside a plain payload. `EvalResult.wait_explanation()`
+  waits for the streamed Tier 3 explanation. `EvalResult.session`.
+
+### Changed
+- **The ingest judge.** Content that only informs — data, notices, errors,
+  empty results, pages about something else — is never blocked, whatever its
+  subject; directive detection is exhaustive and the information around a
+  directive never excuses it; the judge evaluates this payload's implied
+  action and never speculates about a linked page; provenance compares where
+  a payload sends the agent with where it came from; `D` is reserved for
+  unreadable content.
+- **The recall judge.** Values are never a violation, however sensitive; a
+  record is expected to be the answer to the call it was made with; empty
+  results and errors are data; a quoted conversation is data unless the
+  record addresses the agent now; a polite request to the assistant is an
+  instruction.
+- **Verdict extraction.** The verdict is the letter the judge's reply starts
+  with, read to its word boundary; a letter inside a word — or inside the
+  payload's own text, from a judge captured into echoing it — never counts.
+  A reply that opens with a preamble is asked once more, tersely; a second
+  violation is no verdict, with the explanation quoting the reply. Payloads
+  reach the judge fenced, with the protocol restated after them.
+- Every OpenAI and Azure OpenAI model is sent the parameters it accepts:
+  `max_completion_tokens` with headroom for reasoning models, and
+  `temperature` retried away when a model rejects it. No model-name lists.
+- The Tier 3 judge returns at once when a stream ends without a verdict.
+- `settings.risk_tolerance`, undocumented and unused, is removed; declare
+  stakes the documented way, a `HIGH-STAKE:` / `MEDIUM-STAKE:` /
+  `LOW-STAKE:` marker in `scope.more_info`.
+- Example verdicts and lists in the judge prompts use neutral wording.
+
+### Removed
+- **`Metrics.record_error()`, `Metrics.errors` and the `"errors"` key of
+  `Metrics.to_dict()`.** Nothing ever called `record_error()`: a judge timeout,
+  API error or broken stream is returned as a `review` verdict and counted as
+  one, so `errors` was always 0. A counter that reads 0 during an outage is
+  worse than none.
+
 ## [0.2.3] — 2026-09-14
 
 ### Changed
