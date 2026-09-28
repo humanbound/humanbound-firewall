@@ -16,6 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it is given. Setting either now raises a `DeprecationWarning`; both are
   removed in 0.4.
 
+### Fixed
+- **Tier 0 blocks the invisible characters it missed** (#28): the soft hyphen
+  (U+00AD), the C1 controls U+0080–U+009F (NEL among them), U+180E,
+  U+206A–U+206F, the musical formatting characters U+1D173–U+1D17A, and the
+  tag characters U+E0000–U+E007F, which can carry instructions as invisible
+  ASCII. They passed Tier 0 and reached the judge. Tag characters also form
+  the subdivision flag emoji (England, Scotland, Wales), which are now blocked.
+
 ### Docs
 - **README:** the Humanbound CLI section exports the policy file
   (`hb guardrails --format yaml`) and trains Tier 2 with the required

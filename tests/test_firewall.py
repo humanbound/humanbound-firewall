@@ -106,6 +106,13 @@ class TestTier0Sanitization:
             "hello\x00world",  # null byte
             "hello\u200bworld",  # zero-width space
             "hello\u202eworld",  # bidi override
+            "hello\u00adworld",  # soft hyphen
+            "hello\u0085world",  # next line (NEL)
+            "hello\u009bworld",  # C1 control sequence introducer
+            "hello\u180eworld",  # Mongolian vowel separator
+            "hello\u206aworld",  # deprecated format character
+            "hello\U0001d173world",  # musical formatting
+            "hello\U000e0041\U000e0042world",  # tag characters (hidden ASCII)
         ],
     )
     def test_invisible_chars_blocked(self, payload):

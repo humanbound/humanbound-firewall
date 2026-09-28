@@ -31,9 +31,10 @@ logger = logging.getLogger(__name__)
 __all__ = ["Firewall", "AttackDetector", "AttackDetectorEnsemble", "CLASSES"]
 
 _INVISIBLE_CHARS = re.compile(
-    r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f"
-    r"\u200b-\u200f\u2028-\u2029\u202a-\u202e"
-    r"\u2060-\u2064\ufeff\ufff9-\ufffb]"
+    r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f\xad"
+    r"\u180e\u200b-\u200f\u2028-\u2029\u202a-\u202e"
+    r"\u2060-\u2064\u206a-\u206f\ufeff\ufff9-\ufffb"
+    r"\U0001d173-\U0001d17a\U000e0000-\U000e007f]"
 )
 
 
