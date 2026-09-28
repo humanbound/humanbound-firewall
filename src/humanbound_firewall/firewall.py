@@ -758,7 +758,7 @@ def _env(new_key: str, legacy_key: str, default=None):
     """Read an env var, preferring the `HUMANBOUND_FIREWALL_*` name.
 
     Falls back to the legacy `HB_FIREWALL_*` name with a one-time
-    DeprecationWarning. The legacy names are removed in 0.3.
+    DeprecationWarning. The legacy names are removed in 0.4.
     """
     import os
     import warnings
@@ -771,7 +771,7 @@ def _env(new_key: str, legacy_key: str, default=None):
         warnings.warn(
             f"Environment variable {legacy_key} is deprecated; "
             f"use {new_key} instead. "
-            "The legacy HB_FIREWALL_* names will be removed in 0.3.",
+            "The legacy HB_FIREWALL_* names will be removed in 0.4.",
             DeprecationWarning,
             stacklevel=3,
         )
@@ -782,8 +782,8 @@ def _env(new_key: str, legacy_key: str, default=None):
 def _provider_from_env() -> Provider:
     """Build a Provider from HUMANBOUND_FIREWALL_* environment variables.
 
-    Legacy HB_FIREWALL_* names still work for 0.2.x (with a DeprecationWarning);
-    they are removed in 0.3.
+    Legacy HB_FIREWALL_* names still work through 0.3.x (with a DeprecationWarning);
+    they are removed in 0.4.
     """
     provider_name = (_env("HUMANBOUND_FIREWALL_PROVIDER", "HB_FIREWALL_PROVIDER", "") or "").lower()
     api_key = _env("HUMANBOUND_FIREWALL_API_KEY", "HB_FIREWALL_API_KEY", "")

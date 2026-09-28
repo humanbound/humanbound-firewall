@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **The `hb_firewall` alias and the `HB_FIREWALL_*` environment names are
+  removed in 0.4**, not 0.3 as the deprecation messages said; 0.3.x keeps
+  both. The messages now say 0.4.
+- **`settings.session_window` and `settings.temperature` warn.** Both were
+  parsed and never used — the judge runs at temperature 0 and sees every turn
+  it is given. Setting either now raises a `DeprecationWarning`; both are
+  removed in 0.4.
+
+### Docs
+- **README:** the Humanbound CLI section exports the policy file
+  (`hb guardrails --format yaml`) and trains Tier 2 with the required
+  `--model` and the SetFit detector; log mode's background judging
+  (`flush()`, `log_blocking`) is described; few-shot examples are no longer
+  said to be exported by the CLI.
+
 ## [0.3.0] — 2026-09-24
 
 Every path into the model's context is a boundary. This release makes the
