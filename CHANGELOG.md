@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-09-28
+
 ### Changed
 - **The `hb_firewall` alias and the `HB_FIREWALL_*` environment names are
   removed in 0.4**, not 0.3 as the deprecation messages said; 0.3.x keeps
