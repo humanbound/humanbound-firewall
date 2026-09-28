@@ -20,15 +20,26 @@ class TestConfigLoading:
         assert len(config.restricted_intents) == 5
         assert config.timeout == 5
         assert config.mode == "block"
-
-    def test_few_shots_loaded(self):
-        config = load_config(FIXTURES / "agent.yaml")
         assert len(config.few_shots) == 3
         assert config.few_shots[0]["verdict"] == "block"
 
     def test_missing_file_raises(self):
         with pytest.raises(FileNotFoundError):
             load_config("nonexistent.yaml")
+
+    @pytest.mark.parametrize("key", ["session_window", "temperature"])
+    def test_unused_setting_warns(self, tmp_path, key):
+        """Parsed for compatibility, never used; removed in 0.4."""
+        cfg = tmp_path / "agent.yaml"
+        cfg.write_text(f"scope:\n  business: testing\nsettings:\n  {key}: 3\n")
+        with pytest.warns(DeprecationWarning, match=f"settings.{key}.*has no effect"):
+            load_config(cfg)
+
+    def test_no_warning_without_unused_settings(self, tmp_path, recwarn):
+        cfg = tmp_path / "agent.yaml"
+        cfg.write_text("scope:\n  business: testing\nsettings:\n  mode: log\n")
+        load_config(cfg)
+        assert not [w for w in recwarn if issubclass(w.category, DeprecationWarning)]
 
     def test_defaults_applied(self, tmp_path):
         minimal = tmp_path / "minimal.yaml"

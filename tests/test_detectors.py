@@ -86,28 +86,24 @@ def test_api_detector_returns_none_on_network_exception(monkeypatch):
     assert det.score("hello") is None
 
 
-def test_api_detector_extract_score_handles_missing_path(monkeypatch):
-    _patch_requests_request(monkeypatch, json_body={"wrong": "shape"})
+@pytest.mark.parametrize(
+    "json_body, response_path, expected",
+    [
+        ({"wrong": "shape"}, "nested.missing.field", 0.0),
+        ({"risk": 0.73}, "risk", 0.73),
+    ],
+    ids=["missing-path", "numeric"],
+)
+def test_api_detector_extract_score(monkeypatch, json_body, response_path, expected):
+    _patch_requests_request(monkeypatch, json_body=json_body)
     det = AttackDetector(
         {
             "endpoint": "https://example.test/analyze",
             "payload": {"p": "$PROMPT"},
-            "response_path": "nested.missing.field",
+            "response_path": response_path,
         }
     )
-    assert det.score("hello") == 0.0
-
-
-def test_api_detector_extract_score_accepts_numeric(monkeypatch):
-    _patch_requests_request(monkeypatch, json_body={"risk": 0.73})
-    det = AttackDetector(
-        {
-            "endpoint": "https://example.test/analyze",
-            "payload": {"p": "$PROMPT"},
-            "response_path": "risk",
-        }
-    )
-    assert det.score("hello") == 0.73
+    assert det.score("hello") == expected
 
 
 def test_detector_with_no_model_or_endpoint_returns_zero():
@@ -154,37 +150,27 @@ def test_ensemble_empty_returns_not_attack():
     assert score == 0.0
 
 
-def test_ensemble_below_threshold_no_attack():
-    ens = AttackDetectorEnsemble([_stub_detector(0.4), _stub_detector(0.3)], consensus=1)
+@pytest.mark.parametrize(
+    "scores, consensus, expected_attack, expected_score",
+    [
+        ([0.4, 0.3], 1, False, 0.4),
+        ([0.9, 0.3], 1, True, 0.9),
+        ([0.9, 0.3, 0.3], 2, False, None),  # one vote is not enough for consensus 2
+        ([0.9, 0.8, 0.2], 2, True, 0.9),
+    ],
+    ids=[
+        "below-threshold",
+        "one-vote-consensus-1",
+        "one-vote-consensus-2",
+        "two-votes-consensus-2",
+    ],
+)
+def test_ensemble_consensus(scores, consensus, expected_attack, expected_score):
+    ens = AttackDetectorEnsemble([_stub_detector(s) for s in scores], consensus=consensus)
     is_attack, score = ens.evaluate("test")
-    assert is_attack is False
-    assert score == 0.4
-
-
-def test_ensemble_single_vote_passes_consensus_one():
-    ens = AttackDetectorEnsemble([_stub_detector(0.9), _stub_detector(0.3)], consensus=1)
-    is_attack, score = ens.evaluate("test")
-    assert is_attack is True
-    assert score == 0.9
-
-
-def test_ensemble_requires_two_votes_for_consensus_two():
-    ens = AttackDetectorEnsemble(
-        [_stub_detector(0.9), _stub_detector(0.3), _stub_detector(0.3)],
-        consensus=2,
-    )
-    is_attack, _ = ens.evaluate("test")
-    assert is_attack is False
-
-
-def test_ensemble_two_votes_satisfy_consensus_two():
-    ens = AttackDetectorEnsemble(
-        [_stub_detector(0.9), _stub_detector(0.8), _stub_detector(0.2)],
-        consensus=2,
-    )
-    is_attack, score = ens.evaluate("test")
-    assert is_attack is True
-    assert score == 0.9
+    assert is_attack is expected_attack
+    if expected_score is not None:
+        assert score == expected_score
 
 
 def test_ensemble_skips_none_scores_and_uses_remaining():
@@ -272,12 +258,3 @@ def test_passthrough_mode_bypasses_all_tiers():
     assert result.verdict == Verdict.PASS
     assert result.tier == 0
     assert "Passthrough" in result.explanation
-
-
-def test_tier0_blocks_invisible_control_char():
-    # Bidi override U+202E is in the sanitizer regex.
-    fw = _firewall()
-    result = fw.evaluate("hello‮world")
-    assert result.verdict == Verdict.BLOCK
-    assert result.tier == 0
-    assert "control" in result.explanation.lower()

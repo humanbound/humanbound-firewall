@@ -7,6 +7,11 @@ from os import getenv
 
 import requests
 
+# Same parameter handling as the OpenAI provider (see there for the reasoning): the modern
+# `max_completion_tokens` for every deployment, and `temperature` retried away once on the 400
+# that names it. Azure deployment names are arbitrary, so a model-name list could never work here.
+from .openai import _models_without_temperature, _rejects_temperature, _sampling_params
+
 ALLOWED_MAX_OUT_TOKENS = 4096
 DEFAULT_MAX_OUT_TOKENS = 2048
 MAX_RETRY_COUNTER = 3
@@ -27,7 +32,8 @@ class LLMStreamer:
         integ = provider["integration"]
         self.__client = AzureOpenAI(
             api_key=integ["api_key"],
-            api_version=integ.get("api_version", "2024-06-01"),
+            # A Provider dumps an unset api_version as None, so .get()'s default would not apply.
+            api_version=integ.get("api_version") or "2024-06-01",
             azure_endpoint=integ.get("endpoint", ""),
         )
         self.model = integ["model"]
@@ -36,17 +42,25 @@ class LLMStreamer:
         self, system_p, user_p, max_tokens=DEFAULT_MAX_OUT_TOKENS, temperature=DEFAULT_TEMPERATURE
     ):
         max_tokens = min(max_tokens, ALLOWED_MAX_OUT_TOKENS)
-        return self.__client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": system_p},
-                {"role": "user", "content": user_p},
-            ],
-            max_tokens=max_tokens,
-            temperature=temperature,
-            timeout=LLM_PING_TIMEOUT,
-            stream=True,
-        )
+        messages: list = [  # the SDK's typed message params; a plain list is what it accepts at runtime
+            {"role": "system", "content": system_p},
+            {"role": "user", "content": user_p},
+        ]
+        params = _sampling_params(self.model, max_tokens, temperature)
+        try:
+            return self.__client.chat.completions.create(
+                model=self.model, messages=messages, timeout=LLM_PING_TIMEOUT, stream=True, **params
+            )
+        except Exception as e:
+            if "temperature" not in params or not (
+                getattr(e, "status_code", None) == 400 and _rejects_temperature(str(e))
+            ):
+                raise
+            _models_without_temperature.add(self.model)
+            params.pop("temperature")
+            return self.__client.chat.completions.create(
+                model=self.model, messages=messages, timeout=LLM_PING_TIMEOUT, stream=True, **params
+            )
 
 
 class LLMPinger:
@@ -67,8 +81,7 @@ class LLMPinger:
                     {"role": "system", "content": system_p},
                     {"role": "user", "content": user_p},
                 ],
-                "max_tokens": max_tokens,
-                "temperature": temperature,
+                **_sampling_params(integ["model"], max_tokens, temperature),
             },
             timeout=LLM_PING_TIMEOUT,
         )
@@ -96,6 +109,10 @@ class LLMPinger:
                     continue
                 raise Exception("502/Rate limit error.")
             elif resp.status_code == 400:
+                model = self._provider["integration"]["model"]
+                if model not in _models_without_temperature and _rejects_temperature(resp.text):
+                    _models_without_temperature.add(model)
+                    continue  # retry once, now without temperature
                 raise Exception(f"502/Inappropriate content ({resp.text}).")
             else:
                 raise Exception(f"502/Error pinging LLM - {resp.status_code}/{resp.text}")

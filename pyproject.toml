@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "humanbound-firewall"
-version = "0.2.3"
+version = "0.3.0"
 description = "Multi-tier firewall for AI agents — blocks prompt injections, jailbreaks, and scope violations; fast local tiers screen every request, only uncertain cases reach an LLM judge"
 readme = "README.md"
 license = "Apache-2.0"
@@ -77,6 +77,7 @@ dev = [
     "twine>=5.0",
     "pre-commit>=3.8",
     "numpy>=1.24",
+    "langchain>=1.0",  # the LangChain adapter's tests; the adapter itself has no extra
 ]
 
 [project.urls]

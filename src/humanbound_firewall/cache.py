@@ -18,25 +18,24 @@ class PromptCache:
     """
 
     def __init__(self):
-        self._base_prompt: str | None = None
+        self._base_prompts: dict[str, str] = {}
         self._config_hash: str | None = None
 
-    def get_or_build(self, config: AgentConfig) -> str:
-        """Return cached base prompt or build and cache a new one."""
+    def get_or_build(self, config: AgentConfig, cls: str = "request") -> str:
+        """Return the cached base prompt for a trust class, building it if needed."""
         current_hash = self._hash_config(config)
+        if self._config_hash != current_hash:
+            self._base_prompts = {}
+            self._config_hash = current_hash
 
-        if self._base_prompt is not None and self._config_hash == current_hash:
-            return self._base_prompt
-
-        # Build fresh prompt (without session context — that's added per-call)
-        self._base_prompt = build_system_prompt(config, session_turns=None)
-        self._config_hash = current_hash
-
-        return self._base_prompt
+        if cls not in self._base_prompts:
+            # Build fresh prompt (without session context — that's added per-call)
+            self._base_prompts[cls] = build_system_prompt(config, session_turns=None, cls=cls)
+        return self._base_prompts[cls]
 
     def invalidate(self):
         """Force rebuild on next call."""
-        self._base_prompt = None
+        self._base_prompts = {}
         self._config_hash = None
 
     @staticmethod
