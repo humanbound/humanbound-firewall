@@ -484,3 +484,174 @@ def test_the_boundary_carries_the_tools_description_the_policys_expects_and_the_
     assert d.boundary["description"] == "Retrieve the contents of a URL."
     assert d.boundary["expects"] == "a public web page"
     assert d.boundary["args"] == {"url": "http://shop.example/offer"}
+
+
+# --- content blocks: a list is screened like a string ----------------------------------------------
+#
+# LangChain message content is `str | list[str | dict]`. Multimodal messages, and MCP tool results
+# with several parts or an image, arrive as a list; the firewall must judge their text the same way.
+
+IMAGE = {"type": "image", "url": "https://supplier.example/img/lamp.png"}
+
+
+def _list_handler(content, name="fetch_url"):
+    return lambda request: ToolMessage(content=content, tool_call_id="call-1", name=name)
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        [{"type": "text", "text": POISON}],  # one text block
+        ["Desk lamp, £49.", POISON],  # MCP: several text parts become a list of strings
+        [{"type": "text", "text": "Desk lamp, £49."}, IMAGE, {"type": "text", "text": POISON}],
+    ],
+    ids=["text-block", "mcp-parts", "text-and-image"],
+)
+def test_a_poisoned_list_tool_result_is_screened_and_withheld(content):
+    clf = ScriptedClassifier()
+    out = HumanboundFirewallMiddleware(_firewall(clf)).wrap_tool_call(
+        _request(), _list_handler(content)
+    )
+    message = _message(out)
+    assert POISON not in str(message.content) and "restriction" in message.content
+    assert message.tool_call_id == "call-1"
+    assert len(clf.calls) == 1 and POISON in clf.calls[0][0][-1]["u"]
+
+
+def test_the_text_of_every_block_is_judged_together():
+    clf = ScriptedClassifier()
+    HumanboundFirewallMiddleware(_firewall(clf)).wrap_tool_call(
+        _request(), _list_handler([{"type": "text", "text": "part one"}, IMAGE, "part two"])
+    )
+    assert clf.calls[0][0][-1]["u"] == "part one\npart two"  # the image carries no text
+
+
+def test_a_clean_list_tool_result_passes_unchanged():
+    content = [{"type": "text", "text": "Desk lamp, £49, in stock."}, IMAGE]
+    out = HumanboundFirewallMiddleware(_firewall()).wrap_tool_call(
+        _request(), _list_handler(content)
+    )
+    assert _message(out).content == content  # the blocks reach the model as they were
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        [
+            "Desk lamp, £49.",
+            {"type": "search_result", "content": [{"type": "text", "text": POISON}]},
+        ],
+        ["Desk lamp, £49.", {"type": "document", "source": {"type": "text", "data": POISON}}],
+        ["Desk lamp, £49.", {"type": "json", "json": {"note": POISON}}],
+        [{"type": "custom_tool_call_output", "output": POISON}],
+        ["Desk lamp, £49.", {"type": "file", "file": {"filename": "notes.txt", "text": POISON}}],
+    ],
+    ids=["search_result", "document", "json", "custom_tool_call_output", "file"],
+)
+def test_a_block_that_is_not_text_and_not_media_is_still_screened(content):
+    """LangChain keeps document, search_result, json, custom_tool_call_output and file blocks as
+    tool content, and the model reads the text in them. Only media blocks carry no text, so
+    everything else is judged — as its JSON form when it is not a plain text block."""
+    clf = ScriptedClassifier()
+    out = HumanboundFirewallMiddleware(_firewall(clf)).wrap_tool_call(
+        _request(), _list_handler(content)
+    )
+    message = _message(out)
+    assert len(clf.calls) == 1 and POISON in clf.calls[0][0][-1]["u"]
+    assert POISON not in str(message.content) and "restriction" in message.content
+
+
+def test_a_poisoned_text_plain_block_in_a_human_turn_is_rejected():
+    """A human turn can carry `text-plain` beside `text`; both reach the model."""
+    clf = ScriptedClassifier()
+    mw = HumanboundFirewallMiddleware(_request_firewall(clf))
+    turn = HumanMessage(
+        content=[{"type": "text", "text": "hi"}, {"type": "text-plain", "text": POISON}]
+    )
+    update = mw.before_model({"messages": [turn]}, None)
+    assert update["jump_to"] == "end" and clf.calls[0][1] == "request"
+    assert POISON in clf.calls[0][0][-1]["u"]
+
+
+def test_raw_media_bytes_are_dropped_from_a_screened_block():
+    """A non-text block is judged as JSON; base64 payloads carry no text and would swamp the
+    judge, so they are left out while the rest of the block is still read."""
+    clf = ScriptedClassifier()
+    block = {
+        "type": "file",
+        "file": {"filename": "notes.txt", "text": POISON, "base64": "QUFBQUFBQUFBQQ=="},
+    }
+    HumanboundFirewallMiddleware(_firewall(clf)).wrap_tool_call(_request(), _list_handler([block]))
+    judged = clf.calls[0][0][-1]["u"]
+    assert POISON in judged and "QUFBQUFBQUFBQQ==" not in judged
+
+
+def test_a_result_with_no_text_at_all_is_left_untouched():
+    clf = ScriptedClassifier()
+    result = HumanboundFirewallMiddleware(_firewall(clf)).wrap_tool_call(
+        _request(), _list_handler([IMAGE])
+    )
+    assert isinstance(result, ToolMessage) and result.content == [IMAGE] and clf.calls == []
+
+
+def test_a_poisoned_multimodal_human_turn_is_rejected():
+    clf = ScriptedClassifier()
+    mw = HumanboundFirewallMiddleware(_request_firewall(clf))
+    turn = HumanMessage(content=[{"type": "text", "text": POISON}, IMAGE])
+    update = mw.before_model({"messages": [turn]}, None)
+    assert update["jump_to"] == "end" and clf.calls[0][1] == "request"
+    assert clf.calls[0][0][-1]["u"] == POISON
+
+
+def test_list_content_is_kept_in_the_window_and_pinned_as_the_request():
+    clf = ScriptedClassifier()
+    history = [
+        HumanMessage(content=[{"type": "text", "text": "Check the supplier page"}, IMAGE]),
+        ToolMessage(
+            content=["PAGE 1: see", "this week's offer"], tool_call_id="c0", name="fetch_url"
+        ),
+        AIMessage("Following the link."),
+    ]
+    mw = HumanboundFirewallMiddleware(_firewall(clf))
+    mw.wrap_tool_call(_request(messages=history), _handler("PAGE 2"))
+    (conversation, _) = clf.calls[0]
+    assert conversation[0]["u"] == "Check the supplier page"
+    assert conversation[0]["t"] == "PAGE 1: see\nthis week's offer"
+    pinned = mw.before_agent({"messages": history[:1]}, None)[SESSION_KEY]["pinned_request"]
+    assert pinned == "Check the supplier page"
+
+
+def test_a_list_tool_result_is_judged_in_the_background_in_log_mode():
+    clf = ScriptedClassifier()
+    seen = []
+    fw = _firewall(clf, mode="log", on_decision=seen.append)
+    mw = HumanboundFirewallMiddleware(fw)
+    out = mw.wrap_tool_call(_request(), _list_handler([{"type": "text", "text": POISON}]))
+    assert isinstance(out, ToolMessage)  # log mode hands the result on at once
+    assert mw.flush(timeout=5) is True
+    assert [d.verdict.value for d in seen] == ["block"]
+
+
+def test_a_poisoned_list_tool_result_never_reaches_the_model_end_to_end():
+    from langchain.agents import create_agent
+
+    @tool
+    def fetch_url(url: str) -> list:
+        """Fetch a web page."""
+        return [{"type": "text", "text": "Desk lamp, £49."}, {"type": "text", "text": POISON}]
+
+    script = iter(
+        [
+            AIMessage(content="", tool_calls=[_tool_call("fetch_url", "call-1", url="http://x")]),
+            AIMessage(content="I could not read that page."),
+        ]
+    )
+    clf = ScriptedClassifier()
+    agent = create_agent(
+        _ScriptedModel(messages=script),
+        [fetch_url],
+        middleware=[_firewall(clf).adapt_to("langchain")],
+    )
+    result = agent.invoke({"messages": [HumanMessage("Check the supplier page")]})
+    assert POISON not in " ".join(str(m.content) for m in result["messages"])
+    assert result[SESSION_KEY]["counts"]["blocks"] == 1
