@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`ProviderIntegration.reasoning_effort`.** A judge backed by a reasoning
+  model can now be pinned to a reasoning effort (e.g. OpenAI `"minimal"` for a
+  fast, cheap verdict). It is sent only when set; a model that rejects the
+  parameter has it dropped on the first 400 that names it and remembered after,
+  exactly as an unsupported `temperature` already is. Applies to the OpenAI and
+  Azure OpenAI providers.
+
 ## [0.3.1] — 2026-09-28
 
 ### Changed

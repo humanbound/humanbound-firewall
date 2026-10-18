@@ -27,23 +27,53 @@ OPENAI_CHAT_COMPLETION_ENDPOINT = "https://api.openai.com/v1/chat/completions"
 # simply never reached.
 REASONING_TOKEN_HEADROOM = 8192
 
-# Reasoning models also reject a non-default `temperature`. Rather than guess which
-# models do, send it and retry without it once on that specific 400 — then remember, so
-# the wasted request happens once per model, not once per call.
+# Reasoning models also reject a non-default `temperature`, and the classic models reject
+# `reasoning_effort`. Rather than guess which model does which, send what we have and drop the
+# offending parameter on the specific 400 that names it — then remember, so the wasted request
+# happens once per model, not once per call. `reasoning_effort` is only ever sent when the caller
+# asked for one (ProviderIntegration.reasoning_effort); `temperature` is always sent first because
+# classic models honour it.
 _TEMPERATURE_REJECTED = re.compile(r"temperature", re.I)
+_REASONING_EFFORT_REJECTED = re.compile(
+    r"reasoning_effort|reasoning\.effort|reasoning effort", re.I
+)
 _models_without_temperature: set = set()
+_models_without_reasoning_effort: set = set()
 
 
-def _sampling_params(model: str, max_tokens: int, temperature: float) -> dict:
-    """The token-limit / temperature params to send. Works for any model, present or future."""
-    params: dict[str, float] = {"max_completion_tokens": max_tokens + REASONING_TOKEN_HEADROOM}
+def _sampling_params(
+    model: str, max_tokens: int, temperature: float, reasoning_effort: str | None = None
+) -> dict:
+    """The sampling params to send. Works for any model, present or future: a model that turns
+    out to reject `temperature` or `reasoning_effort` has it recorded and dropped on the next call."""
+    params: dict = {"max_completion_tokens": max_tokens + REASONING_TOKEN_HEADROOM}
     if model not in _models_without_temperature:
         params["temperature"] = temperature
+    if reasoning_effort and model not in _models_without_reasoning_effort:
+        params["reasoning_effort"] = reasoning_effort
     return params
 
 
 def _rejects_temperature(error_text: str) -> bool:
     return bool(_TEMPERATURE_REJECTED.search(error_text or ""))
+
+
+def _note_rejected(model: str, error_text: str) -> set:
+    """Record, per model, which sampling params a 400 says this model rejects, and return the
+    names recorded *for the first time* on this call. An empty set means the 400 was about
+    something else (or a param already dropped) and must not be retried away — which also stops
+    a mis-scoped 400 from looping forever."""
+    rejected = set()
+    if _TEMPERATURE_REJECTED.search(error_text or "") and model not in _models_without_temperature:
+        _models_without_temperature.add(model)
+        rejected.add("temperature")
+    if (
+        _REASONING_EFFORT_REJECTED.search(error_text or "")
+        and model not in _models_without_reasoning_effort
+    ):
+        _models_without_reasoning_effort.add(model)
+        rejected.add("reasoning_effort")
+    return rejected
 
 
 class LLMStreamer:
@@ -58,6 +88,7 @@ class LLMStreamer:
             ) from e
         self.__client = OpenAI(api_key=provider["integration"]["api_key"])
         self.model = provider["integration"]["model"]
+        self.reasoning_effort = provider["integration"].get("reasoning_effort")
 
     def ping(
         self, system_p, user_p, max_tokens=DEFAULT_MAX_OUT_TOKENS, temperature=DEFAULT_TEMPERATURE
@@ -67,21 +98,26 @@ class LLMStreamer:
             {"role": "system", "content": system_p},
             {"role": "user", "content": user_p},
         ]
-        params = _sampling_params(self.model, max_tokens, temperature)
-        try:
-            return self.__client.chat.completions.create(
-                model=self.model, messages=messages, timeout=LLM_PING_TIMEOUT, stream=True, **params
-            )
-        except Exception as e:
-            if "temperature" not in params or not (
-                getattr(e, "status_code", None) == 400 and _rejects_temperature(str(e))
-            ):
-                raise
-            _models_without_temperature.add(self.model)
-            params.pop("temperature")
-            return self.__client.chat.completions.create(
-                model=self.model, messages=messages, timeout=LLM_PING_TIMEOUT, stream=True, **params
-            )
+        params = _sampling_params(self.model, max_tokens, temperature, self.reasoning_effort)
+        while True:
+            try:
+                return self.__client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    timeout=LLM_PING_TIMEOUT,
+                    stream=True,
+                    **params,
+                )
+            except Exception as e:
+                drop = (
+                    _note_rejected(self.model, str(e)) & params.keys()
+                    if getattr(e, "status_code", None) == 400
+                    else set()
+                )
+                if not drop:  # a 400 about anything else is a real error, not a param to retry away
+                    raise
+                for name in drop:
+                    params.pop(name)
 
 
 class LLMPinger:
@@ -101,7 +137,12 @@ class LLMPinger:
                     {"role": "system", "content": system_p},
                     {"role": "user", "content": user_p},
                 ],
-                **_sampling_params(self._provider["integration"]["model"], max_tokens, temperature),
+                **_sampling_params(
+                    self._provider["integration"]["model"],
+                    max_tokens,
+                    temperature,
+                    self._provider["integration"].get("reasoning_effort"),
+                ),
             },
             timeout=LLM_PING_TIMEOUT,
         )
@@ -129,11 +170,8 @@ class LLMPinger:
                     continue
                 raise Exception("502/Rate limit error.")
             elif resp.status_code == 400:
-                if self._provider["integration"][
-                    "model"
-                ] not in _models_without_temperature and _rejects_temperature(resp.text):
-                    _models_without_temperature.add(self._provider["integration"]["model"])
-                    continue  # retry once, now without temperature
+                if _note_rejected(self._provider["integration"]["model"], resp.text):
+                    continue  # retry; the next request omits the param(s) the model rejected
                 raise Exception(f"502/Inappropriate content ({resp.text}).")
             else:
                 raise Exception(f"502/Error pinging LLM - {resp.status_code}/{resp.text}")
