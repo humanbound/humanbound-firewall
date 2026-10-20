@@ -139,7 +139,10 @@ class Session:
         counts["by_class"][cls] = counts["by_class"].get(cls, 0) + 1
         if verdict == "block" and category:
             counts["by_category"][category] = counts["by_category"].get(category, 0) + 1
-        digest = hashlib.sha256((result.prompt or "").encode("utf-8")).hexdigest()[:16]
+        # surrogatepass: a payload that cannot be encoded as UTF-8 (a lone surrogate) is still
+        # recorded; raising here, after the verdict, would turn it into an engine failure.
+        payload = (result.prompt or "").encode("utf-8", "surrogatepass")
+        digest = hashlib.sha256(payload).hexdigest()[:16]
         entry = {
             "id": secrets.token_hex(4),  # tells parallel branches' entries apart when merging
             "h": digest,

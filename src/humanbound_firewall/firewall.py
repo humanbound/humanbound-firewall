@@ -34,11 +34,13 @@ __all__ = ["Firewall", "AttackDetector", "AttackDetectorEnsemble", "CLASSES"]
 #
 # Never legitimate in a payload, so blocked: C0 and C1 controls (tab, newline and carriage return
 # aside), the bidi embeddings and overrides that make a URL read backwards, invisible operators,
-# deprecated and annotation format characters, musical formatting, and the tag characters that
-# carry hidden ASCII (outside a subdivision flag, below).
+# deprecated and annotation format characters, musical formatting, the tag characters that
+# carry hidden ASCII (outside a subdivision flag, below), and lone surrogates: never text (a
+# decoded str holds astral characters whole), only an encoding fault that makes the payload
+# impossible to encode as UTF-8 for the judge or the session.
 _INVISIBLE_CHARS = re.compile(
     r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f"
-    r"\u180e\u202a-\u202e\u2061-\u2064\u206a-\u206f\ufff9-\ufffb"
+    r"\u180e\u202a-\u202e\u2061-\u2064\u206a-\u206f\ufff9-\ufffb\ud800-\udfff"
     r"\U0001d173-\U0001d17a\U000e0000-\U000e007f]"
 )
 # Formatting that ordinary text needs: ZWNJ and ZWJ (Persian, Hindi and other scripts, and every
@@ -374,6 +376,13 @@ class Firewall:
             user_prompt = user_prompt_or_conversation
             if window:
                 session_turns = self._history(window)
+
+        # Everything the tiers read is made encodable once, here, so every tier sees the same
+        # text. Tier 0 blocks a payload that is not encodable; the context around it is not the
+        # thing being judged, so it is coerced rather than blocked.
+        session_turns = _encodable_turns(session_turns)
+        agent_prompt = _encodable(agent_prompt or "")
+        boundary = _encodable_boundary(boundary)
 
         classifier = self._scope_classifier
         if current.posture == "elevated" and hasattr(classifier, "tightened"):
@@ -752,6 +761,55 @@ class Firewall:
 # ---------------------------------------------------------------------------
 # Streaming judge extraction (extracted for testability)
 # ---------------------------------------------------------------------------
+
+
+def _encodable(text: str) -> str:
+    """The text with anything that cannot be encoded as UTF-8 replaced by `?`.
+
+    Tier 0 blocks a payload that is not encodable text, but the context around it — the window,
+    the boundary, the agent prompt — is not the payload being judged, and Tier 0 never sees it.
+    A lone surrogate there raises inside a tier instead: a Hugging Face tokenizer refuses it in
+    Tier 2, and every provider SDK encodes its request body as UTF-8 in Tier 3. An exception at
+    that point is "no verdict", which a fail-open deployment passes, so the context is coerced
+    once in evaluate() and every tier reads the same text. A no-op for text that already
+    encodes."""
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError:
+        return text.encode("utf-8", "replace").decode("utf-8")
+    return text
+
+
+def _encodable_turns(turns: list[Turn] | None) -> list[Turn] | None:
+    """The conversation turns, each field made encodable. The caller's turns are left alone."""
+    if not turns:
+        return turns
+    return [
+        Turn(
+            user=_encodable(t.user or ""),
+            assistant=_encodable(t.assistant or ""),
+            tool=_encodable(getattr(t, "tool", "") or ""),
+        )
+        for t in turns
+    ]
+
+
+def _encodable_boundary(boundary: dict | None) -> dict | None:
+    """The boundary with every string in it made encodable, at any depth: the judge is told the
+    tool's name, description, what it expects and what it was called with."""
+    if not boundary:
+        return boundary
+
+    def clean(value):
+        if isinstance(value, str):
+            return _encodable(value)
+        if isinstance(value, dict):
+            return {k: clean(v) for k, v in value.items()}
+        if isinstance(value, (list, tuple)):
+            return type(value)(clean(v) for v in value)
+        return value
+
+    return clean(boundary)
 
 
 def _fence(payload: str, cls: str) -> str:
