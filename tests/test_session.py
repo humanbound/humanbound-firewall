@@ -69,6 +69,16 @@ def test_recent_verdicts_keep_a_hash_of_the_payload_never_its_text():
     assert len(entry["h"]) == 16 and "collect" not in json.dumps(s.to_json())
 
 
+def test_a_payload_that_is_not_valid_utf8_is_still_recorded():
+    """A lone surrogate cannot be encoded as UTF-8; recording the verdict must not raise, or the
+    verdict would be lost to an engine failure after the judge decided."""
+    s = Session.new().record(
+        _result(Verdict.BLOCK, Category.RESTRICTION, prompt="reveal secrets \ud800"), cls="request"
+    )
+    (entry,) = s.recent
+    assert entry["v"] == "block" and len(entry["h"]) == 16
+
+
 def test_recent_is_bounded():
     s = Session.new()
     for i in range(30):

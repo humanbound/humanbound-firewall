@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "humanbound-firewall"
-version = "0.3.1"
+version = "0.3.2"
 description = "Multi-tier firewall for AI agents — blocks prompt injections, jailbreaks, and scope violations; fast local tiers screen every request, only uncertain cases reach an LLM judge"
 readme = "README.md"
 license = "Apache-2.0"
@@ -71,7 +71,7 @@ dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
     "pytest-timeout>=2.3",
-    "ruff==0.17.0",
+    "ruff==0.17.1",
     "mypy>=1.11",
     "build>=1.2",
     "twine>=5.0",
