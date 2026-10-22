@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2] — 2026-10-22
+
+### Changed
+- **Behaviour to note when upgrading.** A slow judge can now hold a payload for up to 30 s
+  (was 5 s) before it times out, and a lone zero-width space or soft hyphen no longer blocks at
+  Tier 0. Both follow from the fixes below; set `settings.timeout` lower for a fast judge.
+
 ### Fixed
 - **The Claude provider works with the 1.x Anthropic SDK and with thinking models.** 1.x removed
   `temperature` from `messages.create`, so every call failed; it is now sent only when the SDK
@@ -30,6 +37,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the classic way of hiding a word, are still blocked, as are controls, bidi overrides and tag
   characters. Only the three RGI subdivision flags (England, Scotland, Wales) pass; any other
   tag sequence, a "flag" carrying hidden ASCII included, is blocked.
+
+### Security
+- **A payload that is not encodable text no longer loses the judge's verdict**
+  ([GHSA-9m82-h4c2-624m](https://github.com/humanbound/humanbound-firewall/security/advisories/GHSA-9m82-h4c2-624m)).
+  A lone surrogate made the engine fail after the verdict, which a fail-open deployment passed.
+  Tier 0 now blocks lone surrogates, and the context around a payload (window, agent prompt,
+  boundary) is made encodable before the tiers run. Affects 0.3.0–0.3.1. Reported by
+  @Ankit1478.
 
 ## [0.3.1] — 2026-09-28
 
