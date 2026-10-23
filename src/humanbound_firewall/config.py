@@ -7,7 +7,7 @@ from pathlib import Path
 
 import yaml
 
-from .models import CAPABILITIES, AgentConfig
+from .models import CAPABILITIES, DEFAULT_JUDGE_TIMEOUT, AgentConfig
 
 _TOOL_CLASSES = ("ingest", "recall")  # a tool's output is never a principal's request
 _FEW_SHOT_CLASSES = ("request", "ingest")  # the judges that learn from examples; recall takes none
@@ -48,7 +48,7 @@ def load_config(path: str | Path) -> AgentConfig:
         more_info=scope.get("more_info", ""),
         permitted_intents=intents.get("permitted", []),
         restricted_intents=intents.get("restricted", []),
-        timeout=settings.get("timeout", 5),
+        timeout=settings.get("timeout", DEFAULT_JUDGE_TIMEOUT),
         mode=settings.get("mode", "block"),
         session_window=settings.get("session_window", 5),
         tier2_min_turns=settings.get("tier2_min_turns", 3),

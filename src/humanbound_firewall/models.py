@@ -96,6 +96,12 @@ class Turn:
     tool: str = ""  # tool output / retrieved content that entered the agent in this turn
 
 
+# Seconds the Tier 3 judge gets for its verdict. Reasoning models, which the providers give extra
+# thinking budget, routinely answer in 5-15 s; a judgement that times out is uncertain, which a
+# fail-open deployment passes. Set settings.timeout lower only for fast, non-reasoning judges.
+DEFAULT_JUDGE_TIMEOUT = 30
+
+
 @dataclass
 class AgentConfig:
     """Agent configuration loaded from YAML."""
@@ -112,7 +118,7 @@ class AgentConfig:
     restricted_intents: list[str] = field(default_factory=list)
 
     # Settings
-    timeout: int = 5
+    timeout: int = DEFAULT_JUDGE_TIMEOUT
     mode: str = "block"  # block | log | passthrough
     session_window: int = 5  # unused; removed in 0.4
     tier2_min_turns: int = 3  # minimum turns before Tier 2 activates

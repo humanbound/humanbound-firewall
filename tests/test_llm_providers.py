@@ -266,14 +266,106 @@ def test_claude_streamer_constructs_and_ping_forwards_args(monkeypatch):
     assert streamer.model == "claude-x"
     fake.Anthropic.assert_called_once_with(api_key="sk-test")
 
+    from humanbound_firewall.llm.claude import THINKING_TOKEN_HEADROOM
+
     streamer.ping("s", "u", max_tokens=50, temperature=0.0)
 
     call = fake_client.messages.create.call_args
     assert call.kwargs["model"] == "claude-x"
     assert call.kwargs["system"] == "s"
     assert call.kwargs["messages"] == [{"role": "user", "content": "u"}]
-    assert call.kwargs["max_tokens"] == 50
+    # the visible budget, plus headroom for a model that thinks before it answers
+    assert call.kwargs["max_tokens"] == 50 + THINKING_TOKEN_HEADROOM
+    assert call.kwargs["temperature"] == 0.0  # sent first: models that accept it honour it
     assert call.kwargs["stream"] is True
+
+
+@pytest.fixture
+def _forget_claude_temperature_rejections():
+    import humanbound_firewall.llm.claude as mod
+
+    mod._models_without_temperature.clear()
+    yield
+    mod._models_without_temperature.clear()
+
+
+class _ClaudeTemperatureRejected(Exception):
+    """What the Anthropic SDK raises when a model is sent a non-default temperature."""
+
+    status_code = 400
+
+    def __init__(self):
+        super().__init__(
+            "Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', "
+            "'message': 'temperature: only the default value is supported for this model'}}"
+        )
+
+
+def _claude(monkeypatch, create):
+    fake = types.ModuleType("anthropic")
+    client = MagicMock()
+    client.messages.create = create
+    fake.Anthropic = MagicMock(return_value=client)
+    fake.RateLimitError = type("RateLimitError", (Exception,), {})
+    fake.AuthenticationError = type("AuthenticationError", (Exception,), {})
+    monkeypatch.setitem(sys.modules, "anthropic", fake)
+    return fake
+
+
+@pytest.mark.usefixtures("_forget_claude_temperature_rejections")
+def test_claude_streamer_retries_without_temperature_and_remembers_the_rejection(monkeypatch):
+    calls = []
+
+    def create(**kwargs):
+        calls.append(kwargs)
+        if "temperature" in kwargs:
+            raise _ClaudeTemperatureRejected()
+        return iter([])
+
+    _claude(monkeypatch, create)
+    from humanbound_firewall.llm.claude import LLMStreamer
+
+    streamer = LLMStreamer(_provider(ProviderName.CLAUDE, model="claude-sonnet-5-5"))
+    streamer.ping("s", "u", max_tokens=100, temperature=0.0)
+    assert len(calls) == 2
+    assert "temperature" in calls[0] and "temperature" not in calls[1]
+    streamer.ping("s", "u")
+    assert len(calls) == 3 and "temperature" not in calls[2]  # one wasted request per model
+
+
+@pytest.mark.usefixtures("_forget_claude_temperature_rejections")
+def test_claude_streamer_does_not_swallow_other_400s(monkeypatch):
+    class Other400(Exception):
+        status_code = 400
+
+    create = MagicMock(side_effect=Other400("prompt is too long"))
+    _claude(monkeypatch, create)
+    from humanbound_firewall.llm.claude import LLMStreamer
+
+    with pytest.raises(Other400):
+        LLMStreamer(_provider(ProviderName.CLAUDE, model="claude-x")).ping("s", "u")
+    assert create.call_count == 1
+
+
+@pytest.mark.usefixtures("_forget_claude_temperature_rejections")
+def test_claude_pinger_reads_the_text_after_a_thinking_block(monkeypatch):
+    reply = MagicMock(
+        content=[
+            types.SimpleNamespace(type="thinking", thinking="let me think", signature="s"),
+            types.SimpleNamespace(type="text", text="P The request is in scope."),
+        ]
+    )
+    _claude(monkeypatch, MagicMock(return_value=reply))
+    from humanbound_firewall.llm.claude import LLMPinger
+
+    assert LLMPinger(_provider(ProviderName.CLAUDE)).ping("s", "u") == "P The request is in scope."
+
+
+def test_the_default_claude_model_ids_are_undated_aliases():
+    """A dated snapshot ID must be one Anthropic published; the default uses the plain alias."""
+    from humanbound_firewall.llm.claude import DEFAULT_MODEL
+
+    assert DEFAULT_MODEL == "claude-sonnet-4-6"
 
 
 def test_claude_missing_dep_raises_actionable(monkeypatch):
@@ -495,3 +587,44 @@ def test_get_llm_streamer_rejects_unknown_provider():
 
     with pytest.raises(ValueError, match="Unsupported"):
         get_llm_streamer({"name": "unsupported", "integration": {}})
+
+
+@pytest.mark.usefixtures("_forget_claude_temperature_rejections")
+def test_claude_never_sends_temperature_to_an_sdk_that_removed_it(monkeypatch):
+    """The 1.x Anthropic SDK dropped `temperature` from messages.create: passing it is a
+    TypeError before any request, for every model."""
+    calls = []
+
+    def create(*, model, max_tokens, messages, system=None, stream=False, timeout=None):
+        calls.append({"model": model, "max_tokens": max_tokens, "stream": stream})
+        return iter([])
+
+    _claude(monkeypatch, create)
+    from humanbound_firewall.llm.claude import LLMPinger, LLMStreamer
+
+    LLMStreamer(_provider(ProviderName.CLAUDE, model="claude-sonnet-5-5")).ping("s", "u")
+    assert len(calls) == 1 and calls[0]["stream"] is True  # one call, no TypeError
+
+    def create_sync(*, model, max_tokens, messages, system=None, timeout=None):
+        return MagicMock(content=[types.SimpleNamespace(type="text", text="P ok")])
+
+    _claude(monkeypatch, create_sync)
+    assert LLMPinger(_provider(ProviderName.CLAUDE)).ping("s", "u") == "P ok"
+
+
+@pytest.mark.usefixtures("_forget_claude_temperature_rejections")
+def test_claude_pinger_sends_an_explicit_timeout(monkeypatch):
+    """With the thinking headroom, the pinger's non-streaming max_tokens exceeds the SDK's
+    non-streaming cap for some models (8192 for Opus 4 / 4.1); the SDK refuses such a request
+    unless it carries an explicit timeout. The pinger sends the same one as the streamer."""
+    create = MagicMock(
+        return_value=MagicMock(content=[types.SimpleNamespace(type="text", text="P ok")])
+    )
+    _claude(monkeypatch, create)
+    from humanbound_firewall.llm.claude import LLM_PING_TIMEOUT, LLMPinger
+
+    assert (
+        LLMPinger(_provider(ProviderName.CLAUDE, model="claude-opus-4-1")).ping("s", "u") == "P ok"
+    )
+    assert create.call_args.kwargs["timeout"] == LLM_PING_TIMEOUT
+    assert create.call_args.kwargs["max_tokens"] > 8192  # the case the SDK would refuse untimed

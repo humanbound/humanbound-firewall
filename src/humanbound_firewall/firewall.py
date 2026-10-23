@@ -30,12 +30,42 @@ logger = logging.getLogger(__name__)
 
 __all__ = ["Firewall", "AttackDetector", "AttackDetectorEnsemble", "CLASSES"]
 
+# Tier 0 tells two kinds of invisible character apart.
+#
+# Never legitimate in a payload, so blocked: C0 and C1 controls (tab, newline and carriage return
+# aside), the bidi embeddings and overrides that make a URL read backwards, invisible operators,
+# deprecated and annotation format characters, musical formatting, the tag characters that
+# carry hidden ASCII (outside a subdivision flag, below), and lone surrogates: never text (a
+# decoded str holds astral characters whole), only an encoding fault that makes the payload
+# impossible to encode as UTF-8 for the judge or the session.
 _INVISIBLE_CHARS = re.compile(
-    r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f\xad"
-    r"\u180e\u200b-\u200f\u2028-\u2029\u202a-\u202e"
-    r"\u2060-\u2064\u206a-\u206f\ufeff\ufff9-\ufffb"
+    r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f"
+    r"\u180e\u202a-\u202e\u2061-\u2064\u206a-\u206f\ufff9-\ufffb\ud800-\udfff"
     r"\U0001d173-\U0001d17a\U000e0000-\U000e007f]"
 )
+# Formatting that ordinary text needs: ZWNJ and ZWJ (Persian, Hindi and other scripts, and every
+# ZWJ emoji), LRM and RLM (Arabic and Hebrew), the soft hyphen, the BOM at the start of a file,
+# the word joiner, line and paragraph separators. These pass Tier 0 and are removed from the text
+# the later tiers judge, so a word split by them to dodge a filter is read whole, while the agent
+# still receives the payload as it was.
+_FORMAT_CHARS = re.compile(r"[\xad\u200b-\u200f\u2028\u2029\u2060\ufeff]")
+# The same characters dropped between single letters ("A\u200bs\u200bs\u200bi..."): the classic way
+# of hiding a word, never how a script uses them. Blocked like the controls above.
+_INTERLEAVED = re.compile(r"(?:[^\W\d_][\xad\u200b-\u200d\u2060]){4,}[^\W\d_]")
+# The three RGI subdivision flags (England, Scotland, Wales): a black flag, the tag letters gbeng,
+# gbsct or gbwls and a cancel tag. The one place tag characters are text, so the one place they
+# pass. Only these three: any other run of tag letters inside a "flag" is hidden ASCII.
+_TAG_FLAG = re.compile(
+    "\U0001f3f4\U000e0067\U000e0062"
+    "(?:\U000e0065\U000e006e\U000e0067|\U000e0073\U000e0063\U000e0074|\U000e0077\U000e006c\U000e0073)"
+    "\U000e007f"
+)
+
+
+def _hidden_characters(text: str) -> bool:
+    """Whether Tier 0 should block: a never-legitimate invisible character, or letters spaced out
+    with invisible ones to hide a word."""
+    return bool(_INVISIBLE_CHARS.search(_TAG_FLAG.sub("", text)) or _INTERLEAVED.search(text))
 
 
 # ---------------------------------------------------------------------------
@@ -347,6 +377,13 @@ class Firewall:
             if window:
                 session_turns = self._history(window)
 
+        # Everything the tiers read is made encodable once, here, so every tier sees the same
+        # text. Tier 0 blocks a payload that is not encodable; the context around it is not the
+        # thing being judged, so it is coerced rather than blocked.
+        session_turns = _encodable_turns(session_turns)
+        agent_prompt = _encodable(agent_prompt or "")
+        boundary = _encodable_boundary(boundary)
+
         classifier = self._scope_classifier
         if current.posture == "elevated" and hasattr(classifier, "tightened"):
             classifier = classifier.tightened()
@@ -441,7 +478,7 @@ class Firewall:
         t_start = time.time()
 
         # --- Tier 0: Sanitization ---
-        if _INVISIBLE_CHARS.search(user_prompt):
+        if _hidden_characters(user_prompt):
             return self._result(
                 Verdict.BLOCK,
                 Category.VIOLATION,
@@ -451,11 +488,14 @@ class Firewall:
                 user_prompt,
                 tier=0,
             )
+        # The later tiers judge the text without its formatting characters; results keep the
+        # payload as it arrived.
+        text = _FORMAT_CHARS.sub("", user_prompt)
 
         # --- Tier 1: Basic attack detection ensemble ---
         if self._ensemble:
-            conversation_text = self._format_session(session_turns, user_prompt)
-            is_attack, score = self._ensemble.evaluate(user_prompt, conversation_text)
+            conversation_text = self._format_session(session_turns, text)
+            is_attack, score = self._ensemble.evaluate(text, conversation_text)
             if is_attack:
                 return self._result(
                     Verdict.BLOCK,
@@ -475,7 +515,7 @@ class Firewall:
         class_aware = getattr(classifier, "supports_class", False)
         tier2_ready = n_turns >= self._config.tier2_min_turns or (cls != "request" and class_aware)
         if classifier and tier2_ready:
-            conversation = self._build_conversation(session_turns, user_prompt, agent_prompt)
+            conversation = self._build_conversation(session_turns, text, agent_prompt)
             if class_aware:
                 result = classifier.classify(conversation, cls=cls)
             else:
@@ -511,8 +551,8 @@ class Firewall:
 
         # --- Tier 3: LLM judge ---
         if self._streamer:
-            return self._run_judge(
-                user_prompt,
+            result = self._run_judge(
+                text,
                 agent_prompt,
                 session_turns,
                 session_id,
@@ -521,6 +561,8 @@ class Firewall:
                 cls,
                 boundary,
             )
+            result.prompt = user_prompt
+            return result
 
         # No Tier 3 available — return ESCALATE
         return self._result(
@@ -721,6 +763,55 @@ class Firewall:
 # ---------------------------------------------------------------------------
 
 
+def _encodable(text: str) -> str:
+    """The text with anything that cannot be encoded as UTF-8 replaced by `?`.
+
+    Tier 0 blocks a payload that is not encodable text, but the context around it — the window,
+    the boundary, the agent prompt — is not the payload being judged, and Tier 0 never sees it.
+    A lone surrogate there raises inside a tier instead: a Hugging Face tokenizer refuses it in
+    Tier 2, and every provider SDK encodes its request body as UTF-8 in Tier 3. An exception at
+    that point is "no verdict", which a fail-open deployment passes, so the context is coerced
+    once in evaluate() and every tier reads the same text. A no-op for text that already
+    encodes."""
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError:
+        return text.encode("utf-8", "replace").decode("utf-8")
+    return text
+
+
+def _encodable_turns(turns: list[Turn] | None) -> list[Turn] | None:
+    """The conversation turns, each field made encodable. The caller's turns are left alone."""
+    if not turns:
+        return turns
+    return [
+        Turn(
+            user=_encodable(t.user or ""),
+            assistant=_encodable(t.assistant or ""),
+            tool=_encodable(getattr(t, "tool", "") or ""),
+        )
+        for t in turns
+    ]
+
+
+def _encodable_boundary(boundary: dict | None) -> dict | None:
+    """The boundary with every string in it made encodable, at any depth: the judge is told the
+    tool's name, description, what it expects and what it was called with."""
+    if not boundary:
+        return boundary
+
+    def clean(value):
+        if isinstance(value, str):
+            return _encodable(value)
+        if isinstance(value, dict):
+            return {k: clean(v) for k, v in value.items()}
+        if isinstance(value, (list, tuple)):
+            return type(value)(clean(v) for v in value)
+        return value
+
+    return clean(boundary)
+
+
 def _fence(payload: str, cls: str) -> str:
     """Outside content and our own records go to the judge fenced, with the protocol re-stated
     after them: the last thing the judge reads is its instruction, not the payload. A payload
@@ -798,7 +889,7 @@ def _provider_from_env() -> Provider:
     defaults = {
         "openai": ("gpt-4o-mini", ProviderName.OPENAI),
         "azureopenai": ("gpt-4o-mini", ProviderName.AZURE_OPENAI),
-        "claude": ("claude-sonnet-4-6-20250514", ProviderName.CLAUDE),
+        "claude": ("claude-sonnet-4-6", ProviderName.CLAUDE),
         "gemini": ("gemini-pro", ProviderName.GEMINI),
     }
 

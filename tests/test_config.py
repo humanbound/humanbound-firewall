@@ -46,8 +46,23 @@ class TestConfigLoading:
         minimal.write_text("name: test\nscope:\n  business: testing\n")
         config = load_config(minimal)
         assert config.name == "test"
-        assert config.timeout == 5
+        assert config.timeout == 30  # room for reasoning judges
         assert config.mode == "block"
         assert config.session_window == 5
         assert config.permitted_intents == []
         assert config.restricted_intents == []
+
+
+def test_the_default_judge_timeout_leaves_room_for_reasoning_models():
+    """Reasoning judges answer in 5-15 s; a 5 s default turned about half of one provider's
+    verdicts into timeouts, which fail-open deployments pass."""
+    from humanbound_firewall.models import DEFAULT_JUDGE_TIMEOUT, AgentConfig
+
+    assert DEFAULT_JUDGE_TIMEOUT >= 30
+    assert AgentConfig().timeout == DEFAULT_JUDGE_TIMEOUT
+
+
+def test_an_explicit_timeout_still_wins(tmp_path):
+    cfg = tmp_path / "agent.yaml"
+    cfg.write_text("scope:\n  business: testing\nsettings:\n  timeout: 8\n")
+    assert load_config(cfg).timeout == 8

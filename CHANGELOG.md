@@ -15,6 +15,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exactly as an unsupported `temperature` already is. Applies to the OpenAI and
   Azure OpenAI providers.
 
+## [0.3.2] — 2026-10-22
+
+### Changed
+- **Behaviour to note when upgrading.** A slow judge can now hold a payload for up to 30 s
+  (was 5 s) before it times out, and a lone zero-width space or soft hyphen no longer blocks at
+  Tier 0. Both follow from the fixes below; set `settings.timeout` lower for a fast judge.
+
+### Fixed
+- **The Claude provider works with the 1.x Anthropic SDK and with thinking models.** 1.x removed
+  `temperature` from `messages.create`, so every call failed; it is now sent only when the SDK
+  takes it, and retried away once when a model rejects it with a 400. Thinking models get token
+  headroom so the verdict is not crowded out, and the non-streaming path reads the first text
+  block rather than a thinking block.
+- **The default Claude model is `claude-sonnet-4-6`.** The previous default,
+  `claude-sonnet-4-6-20250514`, is not a published model ID.
+- **The default judge timeout is 30 seconds, not 5.** The providers give reasoning models extra
+  thinking budget, and those models routinely answer in 5-15 s, so with the 5 s default a large
+  share of verdicts timed out. A timeout is uncertain, which a fail-open deployment passes. In a
+  live run with GPT-6.1 Sol, the 5 s default timed out 9 of 39 judgements on attack
+  payloads; at 30 s, none did. `settings.timeout` still overrides the default.
+- **Tier 0 no longer blocks text that needs invisible formatting characters.** ZWNJ and ZWJ
+  (Persian, Hindi and other scripts, and every ZWJ emoji such as 👩‍💻), LRM and RLM (Arabic,
+  Hebrew), the soft hyphen, a BOM at the start of a file, the word joiner and line separators
+  blocked the whole payload as a `violation`, so ordinary requests, pages and records in those
+  scripts never reached the agent. They now pass Tier 0 and are removed from the text the later
+  tiers judge, so a word split by them to dodge a filter (#28) is read whole; the agent still
+  receives the payload as it was. Letters spaced out with these characters (`A\u200bs\u200bs\u200bi…`),
+  the classic way of hiding a word, are still blocked, as are controls, bidi overrides and tag
+  characters. Only the three RGI subdivision flags (England, Scotland, Wales) pass; any other
+  tag sequence, a "flag" carrying hidden ASCII included, is blocked.
+
+### Security
+- **A payload that is not encodable text no longer loses the judge's verdict**
+  ([GHSA-9m82-h4c2-624m](https://github.com/humanbound/humanbound-firewall/security/advisories/GHSA-9m82-h4c2-624m)).
+  A lone surrogate made the engine fail after the verdict, which a fail-open deployment passed.
+  Tier 0 now blocks lone surrogates, and the context around a payload (window, agent prompt,
+  boundary) is made encodable before the tiers run. Affects 0.3.0–0.3.1. Reported by
+  @Ankit1478.
+
 ## [0.3.1] — 2026-09-28
 
 ### Changed

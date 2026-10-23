@@ -74,7 +74,7 @@ intents:
     - Access or modify other users' accounts
 
 settings:
-  timeout: 5
+  timeout: 30
   mode: block
   tier2_min_turns: 3
 """)

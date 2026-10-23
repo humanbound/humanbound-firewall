@@ -181,7 +181,8 @@ Every payload passes through four tiers before it reaches your model:
 Payload (request | ingest | recall)
     |
 [ Tier 0 ]  Sanitization                    no model call, free
-    |        Blocks invisible control characters, zero-width joiners, bidi overrides, tag characters.
+    |        Blocks control characters, bidi overrides and tag characters; strips formatting
+    |        characters (ZWJ, ZWNJ, soft hyphen, BOM) before the later tiers judge.
     |
 [ Tier 1 ]  Basic Attack Detection          local model inference, free
     |        Pre-trained models (DeBERTa, Azure Content Safety, Lakera, etc.)
