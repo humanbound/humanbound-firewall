@@ -38,6 +38,7 @@ def _provider(name: ProviderName, **kw) -> Provider:
             model=kw.get("model", "test-model"),
             endpoint=kw.get("endpoint"),
             api_version=kw.get("api_version"),
+            reasoning_effort=kw.get("reasoning_effort"),
         ),
     )
 
@@ -63,16 +64,31 @@ class _TemperatureRejected(Exception):
         )
 
 
+class _ReasoningEffortRejected(Exception):
+    """What the OpenAI SDK raises when a model is sent a `reasoning_effort` it does not support."""
+
+    status_code = 400
+
+    def __init__(self):
+        super().__init__(
+            "Error code: 400 - {'error': {'message': \"Unsupported parameter: 'reasoning_effort' "
+            'is not supported with this model.", '
+            "'param': 'reasoning_effort', 'code': 'unsupported_parameter'}}"
+        )
+
+
 @pytest.fixture(autouse=True)
-def _forget_temperature_rejections():
+def _forget_rejections():
     import humanbound_firewall.llm.openai as mod
 
     mod._models_without_temperature.clear()
+    mod._models_without_reasoning_effort.clear()
     yield
     mod._models_without_temperature.clear()
+    mod._models_without_reasoning_effort.clear()
 
 
-def _streamer(monkeypatch, model, reject_temperature=False):
+def _streamer(monkeypatch, model, reject_temperature=False, reject_reasoning_effort=False, **kw):
     fake_openai = types.ModuleType("openai")
     fake_client = MagicMock()
     calls = []
@@ -81,6 +97,8 @@ def _streamer(monkeypatch, model, reject_temperature=False):
         calls.append(kwargs)
         if reject_temperature and "temperature" in kwargs:
             raise _TemperatureRejected()
+        if reject_reasoning_effort and "reasoning_effort" in kwargs:
+            raise _ReasoningEffortRejected()
         return iter([])
 
     fake_client.chat.completions.create = create
@@ -88,7 +106,7 @@ def _streamer(monkeypatch, model, reject_temperature=False):
     monkeypatch.setitem(sys.modules, "openai", fake_openai)
     from humanbound_firewall.llm.openai import LLMStreamer
 
-    return LLMStreamer(_provider(ProviderName.OPENAI, model=model)), calls
+    return LLMStreamer(_provider(ProviderName.OPENAI, model=model, **kw)), calls
 
 
 @pytest.mark.parametrize("model", ["test-model", *ANY_MODEL])
@@ -150,7 +168,31 @@ def test_openai_streamer_does_not_swallow_other_400s(monkeypatch):
     assert fake_client.chat.completions.create.call_count == 1
 
 
-def _pinger_calls(monkeypatch, model, reject_temperature=False):
+def test_openai_streamer_sends_reasoning_effort_only_when_configured(monkeypatch):
+    with_effort, calls_with = _streamer(monkeypatch, "gpt-5-mini", reasoning_effort="minimal")
+    with_effort.ping("s", "u")
+    assert calls_with[0]["reasoning_effort"] == "minimal"
+
+    without_effort, calls_without = _streamer(monkeypatch, "gpt-5-mini")
+    without_effort.ping("s", "u")
+    assert "reasoning_effort" not in calls_without[0]  # None means: let the model's default stand
+
+
+def test_openai_streamer_drops_a_rejected_reasoning_effort_and_remembers_it(monkeypatch):
+    streamer, calls = _streamer(
+        monkeypatch, "gpt-4o", reject_reasoning_effort=True, reasoning_effort="minimal"
+    )
+    streamer.ping("s", "u")
+    assert len(calls) == 2
+    assert "reasoning_effort" in calls[0] and "reasoning_effort" not in calls[1]
+    streamer.ping("s", "u")
+    assert len(calls) == 3  # one wasted request in total, not one per call
+    assert "reasoning_effort" not in calls[2]
+
+
+def _pinger_calls(
+    monkeypatch, model, reject_temperature=False, reject_reasoning_effort=False, **kw
+):
     import humanbound_firewall.llm.openai as mod
 
     bodies = []
@@ -159,12 +201,14 @@ def _pinger_calls(monkeypatch, model, reject_temperature=False):
         bodies.append(json)
         if reject_temperature and "temperature" in json:
             return MagicMock(status_code=400, text=str(_TemperatureRejected()))
+        if reject_reasoning_effort and "reasoning_effort" in json:
+            return MagicMock(status_code=400, text=str(_ReasoningEffortRejected()))
         return MagicMock(
             status_code=200, json=lambda: {"choices": [{"message": {"content": "ok"}}]}
         )
 
     monkeypatch.setattr(mod.requests, "post", post)
-    return mod.LLMPinger(_provider(ProviderName.OPENAI, model=model)), bodies
+    return mod.LLMPinger(_provider(ProviderName.OPENAI, model=model, **kw)), bodies
 
 
 @pytest.mark.parametrize("model", ANY_MODEL)
@@ -183,6 +227,18 @@ def test_openai_pinger_uses_max_completion_tokens_and_retries_without_a_rejected
     pinger, bodies = _pinger_calls(monkeypatch, model, reject_temperature=True)
     assert pinger.ping("s", "u") == "ok"
     assert len(bodies) == 2 and "temperature" not in bodies[1]
+
+
+def test_openai_pinger_sends_and_retries_away_a_rejected_reasoning_effort(monkeypatch):
+    pinger, bodies = _pinger_calls(monkeypatch, "gpt-5-mini", reasoning_effort="low")
+    pinger.ping("s", "u")
+    assert bodies[0]["reasoning_effort"] == "low"
+
+    pinger, bodies = _pinger_calls(
+        monkeypatch, "gpt-4o", reject_reasoning_effort=True, reasoning_effort="low"
+    )
+    assert pinger.ping("s", "u") == "ok"
+    assert len(bodies) == 2 and "reasoning_effort" not in bodies[1]
 
 
 def test_openai_streamer_missing_dep_raises_actionable(monkeypatch):

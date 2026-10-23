@@ -8,9 +8,10 @@ from os import getenv
 import requests
 
 # Same parameter handling as the OpenAI provider (see there for the reasoning): the modern
-# `max_completion_tokens` for every deployment, and `temperature` retried away once on the 400
-# that names it. Azure deployment names are arbitrary, so a model-name list could never work here.
-from .openai import _models_without_temperature, _rejects_temperature, _sampling_params
+# `max_completion_tokens` for every deployment, and `temperature` / `reasoning_effort` dropped on
+# the 400 that names them. Azure deployment names are arbitrary, so a model-name list could never
+# work here — the drop-and-remember is keyed on the deployment name just the same.
+from .openai import _note_rejected, _sampling_params
 
 ALLOWED_MAX_OUT_TOKENS = 4096
 DEFAULT_MAX_OUT_TOKENS = 2048
@@ -37,6 +38,7 @@ class LLMStreamer:
             azure_endpoint=integ.get("endpoint", ""),
         )
         self.model = integ["model"]
+        self.reasoning_effort = integ.get("reasoning_effort")
 
     def ping(
         self, system_p, user_p, max_tokens=DEFAULT_MAX_OUT_TOKENS, temperature=DEFAULT_TEMPERATURE
@@ -46,21 +48,26 @@ class LLMStreamer:
             {"role": "system", "content": system_p},
             {"role": "user", "content": user_p},
         ]
-        params = _sampling_params(self.model, max_tokens, temperature)
-        try:
-            return self.__client.chat.completions.create(
-                model=self.model, messages=messages, timeout=LLM_PING_TIMEOUT, stream=True, **params
-            )
-        except Exception as e:
-            if "temperature" not in params or not (
-                getattr(e, "status_code", None) == 400 and _rejects_temperature(str(e))
-            ):
-                raise
-            _models_without_temperature.add(self.model)
-            params.pop("temperature")
-            return self.__client.chat.completions.create(
-                model=self.model, messages=messages, timeout=LLM_PING_TIMEOUT, stream=True, **params
-            )
+        params = _sampling_params(self.model, max_tokens, temperature, self.reasoning_effort)
+        while True:
+            try:
+                return self.__client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    timeout=LLM_PING_TIMEOUT,
+                    stream=True,
+                    **params,
+                )
+            except Exception as e:
+                drop = (
+                    _note_rejected(self.model, str(e)) & params.keys()
+                    if getattr(e, "status_code", None) == 400
+                    else set()
+                )
+                if not drop:
+                    raise
+                for name in drop:
+                    params.pop(name)
 
 
 class LLMPinger:
@@ -81,7 +88,9 @@ class LLMPinger:
                     {"role": "system", "content": system_p},
                     {"role": "user", "content": user_p},
                 ],
-                **_sampling_params(integ["model"], max_tokens, temperature),
+                **_sampling_params(
+                    integ["model"], max_tokens, temperature, integ.get("reasoning_effort")
+                ),
             },
             timeout=LLM_PING_TIMEOUT,
         )
@@ -109,10 +118,8 @@ class LLMPinger:
                     continue
                 raise Exception("502/Rate limit error.")
             elif resp.status_code == 400:
-                model = self._provider["integration"]["model"]
-                if model not in _models_without_temperature and _rejects_temperature(resp.text):
-                    _models_without_temperature.add(model)
-                    continue  # retry once, now without temperature
+                if _note_rejected(self._provider["integration"]["model"], resp.text):
+                    continue  # retry; the next request omits the param(s) the deployment rejected
                 raise Exception(f"502/Inappropriate content ({resp.text}).")
             else:
                 raise Exception(f"502/Error pinging LLM - {resp.status_code}/{resp.text}")
