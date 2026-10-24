@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **An eval suite (`evals/`)** that scores the firewall's decisions, not just
+  its code: 443 labelled cases across the three trust classes plus two hard
+  gates (`must_pass`, `must_block`), seven policies, run configs for each tier
+  and judge, a runner with a reply cache and repeats, a scorer with Wilson
+  intervals, release gates and baselines, and a label check against several
+  LLM judges. The runner gives the judge the policy's `tools.expects`, as the
+  LangChain adapter does, so the offline prompt is the one that ships.
+
 ## [0.3.2] — 2026-10-22
 
 ### Changed

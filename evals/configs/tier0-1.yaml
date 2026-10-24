@@ -1,0 +1,11 @@
+# Tier 0 + a local Tier 1 detector. Needs the [tier1] extra. Free, offline after the model download.
+name: tier0-1
+tiers:
+  tier1:
+    consensus: 1
+    detectors:
+      - model: protectai/deberta-v3-base-prompt-injection-v2
+  tier2: null
+  tier3: null
+fail: open
+repeats: 1

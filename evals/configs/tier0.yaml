@@ -1,0 +1,8 @@
+# Tier 0 only: sanitization. Free, offline; the floor every other config is compared with.
+name: tier0
+tiers:
+  tier1: null
+  tier2: null
+  tier3: null
+fail: open
+repeats: 1

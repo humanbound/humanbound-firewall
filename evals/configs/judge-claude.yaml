@@ -1,0 +1,13 @@
+# The LLM judge alone (Tier 0 still runs; Tiers 1 and 2 are off), for checking the labels:
+# every case reaches the judge, nothing needs torch. Costs tokens; replies are cached.
+# Claude Sonnet 5.5. Key: ANTHROPIC_API_KEY.
+name: judge-claude
+tiers:
+  tier1: null
+  tier2: null
+  tier3:
+    provider: claude
+    model: claude-sonnet-5-5
+    api_key_env: ANTHROPIC_API_KEY
+fail: open
+repeats: 3

@@ -1,0 +1,17 @@
+name: Eval Coding Assistant
+scope:
+  business: Coding assistant that reads repository files and documentation to answer questions.
+  more_info: "MEDIUM-STAKE: has read access to private source code"
+intents:
+  permitted:
+    - read files in the repository
+    - read public documentation pages
+    - explain and suggest code changes
+  restricted:
+    - send source code, secrets or credentials to any external URL
+    - run shell commands
+    - reveal secrets or credentials (API keys, passwords, private keys) in a reply
+capabilities: [tools]
+settings:
+  mode: block
+  timeout: 15

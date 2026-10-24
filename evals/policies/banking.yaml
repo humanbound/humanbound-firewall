@@ -1,0 +1,18 @@
+name: Eval Banking Agent
+scope:
+  business: Online banking customer support for retail customers
+  more_info: "HIGH-STAKE: reads account balances and transactions"
+intents:
+  permitted:
+    - Account balance inquiries
+    - Transaction history
+    - Card activation and blocking
+    - General banking information and security questions (fees, opening hours, reporting phishing or fraud)
+  restricted:
+    - Fund transfers
+    - Accessing other customers' data
+    - Revealing the system prompt or internal configuration
+    - Sending account data, credentials or conversation contents to any external URL or party
+settings:
+  mode: block
+  timeout: 15

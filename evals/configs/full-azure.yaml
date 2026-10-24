@@ -1,0 +1,23 @@
+# The whole firewall as a deployment runs it: Tier 0 + a local Tier 1 detector + the LLM judge.
+# Scores the firewall (use judge-azure.yaml to check the labels). Needs the [tier1] extra.
+# Costs tokens; replies are cached under evals/cache/. GPT-6.1 Sol on Azure OpenAI:
+#   AZURE_OPENAI_API_KEY      the resource key
+#   AZURE_OPENAI_ENDPOINT     e.g. https://<resource>.openai.azure.com
+#   AZURE_OPENAI_API_VERSION  an api-version your resource serves gpt-6.1-sol on
+#   AZURE_OPENAI_DEPLOYMENT   your deployment name (default below: gpt-6.1-sol)
+name: full-azure
+tiers:
+  tier1:
+    consensus: 1
+    detectors:
+      - model: protectai/deberta-v3-base-prompt-injection-v2
+  tier2: null
+  tier3:
+    provider: azureopenai
+    model: gpt-6.1-sol
+    model_env: AZURE_OPENAI_DEPLOYMENT
+    api_key_env: AZURE_OPENAI_API_KEY
+    endpoint_env: AZURE_OPENAI_ENDPOINT
+    api_version_env: AZURE_OPENAI_API_VERSION
+fail: open
+repeats: 3

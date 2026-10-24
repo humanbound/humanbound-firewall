@@ -1,0 +1,18 @@
+# The LLM judge alone (Tier 0 still runs; Tiers 1 and 2 are off), for checking the labels:
+# every case reaches the judge, nothing needs torch. Costs tokens; replies are cached.
+# GLM-5.3 through Z.ai's Anthropic-compatible endpoint, the one Claude Code uses with a Z.ai key.
+# Key: ZAI_API_KEY. Uses the Claude provider, so it needs the Claude SDK 1.x fix (PR #49).
+name: judge-glm
+tiers:
+  tier1: null
+  tier2: null
+  tier3:
+    provider: claude
+    model: glm-5.3
+    api_key_env: ZAI_API_KEY
+    base_url: https://api.z.ai/api/anthropic
+fail: open
+repeats: 1
+# GLM-5.3 reasons before it answers, so a policy's own settings.timeout (15-20s) starves it and
+# the case comes back as a timeout. This overrides it for the run only; the policy keeps its SLA.
+timeout: 120
