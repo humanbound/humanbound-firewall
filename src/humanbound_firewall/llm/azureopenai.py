@@ -60,7 +60,7 @@ class LLMStreamer:
                 )
             except Exception as e:
                 drop = (
-                    _note_rejected(self.model, str(e)) & params.keys()
+                    _note_rejected(self.model, str(e), getattr(e, "param", None)) & params.keys()
                     if getattr(e, "status_code", None) == 400
                     else set()
                 )

@@ -57,19 +57,23 @@ def _sampling_params(
     return params
 
 
-def _note_rejected(model: str, error_text: str) -> set:
+def _note_rejected(model: str, error_text: str, param: str | None = None) -> set:
     """Record, per model, which sampling params a 400 says this model rejects, and return the
     names recorded *for the first time* on this call. An empty set means the 400 was about
     something else (or a param already dropped) and must not be retried away — which also stops
-    a mis-scoped 400 from looping forever."""
+    a mis-scoped 400 from looping forever.
+
+    `param` is the SDK's structured `error.param`, read first: the openai SDK's message for an
+    invalid value ("Invalid value: 'hihg'. Supported values are: ...") does not name the param."""
     rejected = set()
-    if _TEMPERATURE_REJECTED.search(error_text or "") and model not in _models_without_temperature:
+    if (
+        param == "temperature" or _TEMPERATURE_REJECTED.search(error_text or "")
+    ) and model not in _models_without_temperature:
         _models_without_temperature.add(model)
         rejected.add("temperature")
     if (
-        _REASONING_EFFORT_REJECTED.search(error_text or "")
-        and model not in _models_without_reasoning_effort
-    ):
+        param == "reasoning_effort" or _REASONING_EFFORT_REJECTED.search(error_text or "")
+    ) and model not in _models_without_reasoning_effort:
         _models_without_reasoning_effort.add(model)
         rejected.add("reasoning_effort")
         # The same 400 covers a model without the param and an invalid value (a typo like
@@ -116,7 +120,7 @@ class LLMStreamer:
                 )
             except Exception as e:
                 drop = (
-                    _note_rejected(self.model, str(e)) & params.keys()
+                    _note_rejected(self.model, str(e), getattr(e, "param", None)) & params.keys()
                     if getattr(e, "status_code", None) == 400
                     else set()
                 )

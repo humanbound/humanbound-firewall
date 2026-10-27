@@ -77,6 +77,20 @@ class _ReasoningEffortRejected(Exception):
         )
 
 
+class _InvalidReasoningEffort(Exception):
+    """What the current openai SDK raises for an invalid value: the message does not name the
+    param, which is only in the structured `param` attribute."""
+
+    status_code = 400
+    param = "reasoning_effort"
+
+    def __init__(self):
+        super().__init__(
+            "Error code: 400 - Invalid value: 'hihg'. "
+            "Supported values are: 'minimal', 'low', 'medium', and 'high'."
+        )
+
+
 @pytest.fixture(autouse=True)
 def _forget_rejections():
     import humanbound_firewall.llm.openai as mod
@@ -98,7 +112,8 @@ def _streamer(monkeypatch, model, reject_temperature=False, reject_reasoning_eff
         if reject_temperature and "temperature" in kwargs:
             raise _TemperatureRejected()
         if reject_reasoning_effort and "reasoning_effort" in kwargs:
-            raise _ReasoningEffortRejected()
+            error = reject_reasoning_effort
+            raise (error if isinstance(error, type) else _ReasoningEffortRejected)()
         return iter([])
 
     fake_client.chat.completions.create = create
@@ -178,9 +193,14 @@ def test_openai_streamer_sends_reasoning_effort_only_when_configured(monkeypatch
     assert "reasoning_effort" not in calls_without[0]  # None means: let the model's default stand
 
 
-def test_openai_streamer_drops_a_rejected_reasoning_effort_and_remembers_it(monkeypatch, caplog):
+@pytest.mark.parametrize(
+    "error", [_ReasoningEffortRejected, _InvalidReasoningEffort], ids=["unsupported", "invalid"]
+)
+def test_openai_streamer_drops_a_rejected_reasoning_effort_and_remembers_it(
+    monkeypatch, caplog, error
+):
     streamer, calls = _streamer(
-        monkeypatch, "gpt-4o", reject_reasoning_effort=True, reasoning_effort="minimal"
+        monkeypatch, "gpt-4o", reject_reasoning_effort=error, reasoning_effort="minimal"
     )
     streamer.ping("s", "u")
     assert len(calls) == 2
@@ -450,7 +470,9 @@ def test_azure_openai_streamer_defaults_the_api_version_when_the_provider_leaves
     assert fake_openai.AzureOpenAI.call_args.kwargs["api_version"] == "2024-06-01"
 
 
-def _azure_streamer(monkeypatch, model, reject_temperature=False):
+def _azure_streamer(
+    monkeypatch, model, reject_temperature=False, reject_reasoning_effort=None, **kw
+):
     fake_openai = types.ModuleType("openai")
     fake_client = MagicMock()
     calls = []
@@ -459,6 +481,8 @@ def _azure_streamer(monkeypatch, model, reject_temperature=False):
         calls.append(kwargs)
         if reject_temperature and "temperature" in kwargs:
             raise _TemperatureRejected()
+        if reject_reasoning_effort and "reasoning_effort" in kwargs:
+            raise reject_reasoning_effort()
         return iter([])
 
     fake_client.chat.completions.create = create
@@ -467,8 +491,19 @@ def _azure_streamer(monkeypatch, model, reject_temperature=False):
     from humanbound_firewall.llm.azureopenai import LLMStreamer
 
     return LLMStreamer(
-        _provider(ProviderName.AZURE_OPENAI, model=model, endpoint="https://x.openai.azure.com")
+        _provider(
+            ProviderName.AZURE_OPENAI, model=model, endpoint="https://x.openai.azure.com", **kw
+        )
     ), calls
+
+
+def test_azure_streamer_drops_an_invalid_reasoning_effort_named_only_by_param(monkeypatch):
+    streamer, calls = _azure_streamer(
+        monkeypatch, "dep", reject_reasoning_effort=_InvalidReasoningEffort, reasoning_effort="hihg"
+    )
+    streamer.ping("s", "u")
+    assert len(calls) == 2
+    assert "reasoning_effort" in calls[0] and "reasoning_effort" not in calls[1]
 
 
 @pytest.mark.parametrize("model", ANY_MODEL)
