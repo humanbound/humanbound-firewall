@@ -178,16 +178,20 @@ def test_openai_streamer_sends_reasoning_effort_only_when_configured(monkeypatch
     assert "reasoning_effort" not in calls_without[0]  # None means: let the model's default stand
 
 
-def test_openai_streamer_drops_a_rejected_reasoning_effort_and_remembers_it(monkeypatch):
+def test_openai_streamer_drops_a_rejected_reasoning_effort_and_remembers_it(monkeypatch, caplog):
     streamer, calls = _streamer(
         monkeypatch, "gpt-4o", reject_reasoning_effort=True, reasoning_effort="minimal"
     )
     streamer.ping("s", "u")
     assert len(calls) == 2
     assert "reasoning_effort" in calls[0] and "reasoning_effort" not in calls[1]
+    # A typo'd effort draws the same 400 as an unsupported one, so the drop must not be silent.
+    assert "gpt-4o" in caplog.text and "reasoning_effort" in caplog.text
+    caplog.clear()
     streamer.ping("s", "u")
     assert len(calls) == 3  # one wasted request in total, not one per call
     assert "reasoning_effort" not in calls[2]
+    assert not caplog.text  # warned once per model, not once per call
 
 
 def _pinger_calls(

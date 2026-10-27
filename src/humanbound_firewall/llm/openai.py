@@ -2,11 +2,14 @@
 # Copyright (c) 2024-2026 Humanbound
 """OpenAI provider."""
 
+import logging
 import re
 import time
 from os import getenv
 
 import requests
+
+logger = logging.getLogger(__name__)
 
 ALLOWED_MAX_OUT_TOKENS = 4096
 DEFAULT_MAX_OUT_TOKENS = 2048
@@ -54,10 +57,6 @@ def _sampling_params(
     return params
 
 
-def _rejects_temperature(error_text: str) -> bool:
-    return bool(_TEMPERATURE_REJECTED.search(error_text or ""))
-
-
 def _note_rejected(model: str, error_text: str) -> set:
     """Record, per model, which sampling params a 400 says this model rejects, and return the
     names recorded *for the first time* on this call. An empty set means the 400 was about
@@ -73,6 +72,13 @@ def _note_rejected(model: str, error_text: str) -> set:
     ):
         _models_without_reasoning_effort.add(model)
         rejected.add("reasoning_effort")
+        # The same 400 covers a model without the param and an invalid value (a typo like
+        # "hihg"); either way the configured effort is no longer applied, so say so.
+        logger.warning(
+            "Model %s rejected the configured reasoning_effort; continuing without it: %s",
+            model,
+            error_text,
+        )
     return rejected
 
 
