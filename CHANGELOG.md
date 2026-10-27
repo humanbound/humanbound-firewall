@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.3] — 2026-10-27
+
+### Changed
+- **A provider refusal now blocks by default.** When the Tier 3 judge's provider refuses to
+  evaluate a payload, the firewall reads it as a block instead of "no verdict".
+  `Firewall(on_refusal="review")` / `from_config(on_refusal=...)` keeps the previous reading: an
+  uncertain verdict decided by `fail`. Provider filters occasionally refuse benign text too (an
+  article explaining prompt injection, for example), which the new default blocks.
+
+### Security
+- **The LangChain middleware screens message content given as a list of blocks**
+  ([GHSA-vxpw-754f-ggrm](https://github.com/humanbound/humanbound-firewall/security/advisories/GHSA-vxpw-754f-ggrm)).
+  Content that arrived as a list — every MCP tool result, multimodal turns, tools returning
+  content blocks — reached the model without being screened, whatever the mode or fail setting.
+  `text` blocks are now judged as text and any other non-media block as its JSON form; only
+  `image`, `image_url`, `audio` and `video` are skipped. Affects 0.3.0–0.3.2. Reported by
+  @Ankit1478.
+- **A provider refusal is a verdict, not "no verdict"**
+  ([GHSA-gj79-4h8c-wpgf](https://github.com/humanbound/humanbound-firewall/security/advisories/GHSA-gj79-4h8c-wpgf)).
+  When the judge's provider refused to evaluate a payload (Claude's `refusal` stop, an OpenAI or
+  Azure content filter, a safety-blocked Gemini chunk), the result was "no verdict", which a
+  fail-open deployment passed. A refusal now blocks by default (see Changed). Affects
+  0.3.0–0.3.2. Reported by @Ankit1478.
+
 ## [0.3.2] — 2026-10-22
 
 ### Changed
