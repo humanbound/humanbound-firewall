@@ -34,6 +34,7 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import threading
 from collections import deque
@@ -215,8 +216,8 @@ class HumanboundFirewallMiddleware(AgentMiddleware):
             return written  # a later model call in the same run: the turn was judged already
         if self.firewall.guard.mode_for("request") == "off":
             return written
-        text = messages[-1].content
-        if not isinstance(text, str):
+        text = _text(messages[-1].content)
+        if text is None:  # no text to judge (an image alone)
             return written
         window = self._window(messages[:-1])
         if self._background("request"):  # log mode: a request is never rejected, so do not wait
@@ -277,13 +278,15 @@ class HumanboundFirewallMiddleware(AgentMiddleware):
         return not self._log_blocking and self.firewall.guard.mode_for(cls) == "log"
 
     def _screen(self, request, result):
-        if not isinstance(result, ToolMessage) or not isinstance(result.content, str):
+        if not isinstance(result, ToolMessage):
+            return result
+        payload = _text(result.content)
+        if payload is None:  # no text to judge (an image or file alone)
             return result
         name = request.tool_call.get("name", "")
         cls = self.firewall.config.class_of(name)
         description = str(getattr(getattr(request, "tool", None), "description", "") or "")
         # Everything the judge sees is fixed here, when the tool returned.
-        payload = result.content
         window = self._window(request.state.get("messages", []))
         boundary = {
             **self._tool_boundary(name, description),
@@ -411,11 +414,10 @@ class HumanboundFirewallMiddleware(AgentMiddleware):
         window = []
         for message in messages:
             for kind, role in _ROLES:
-                if isinstance(message, kind) and isinstance(message.content, str):
-                    if message.content:
-                        window.append(
-                            {"role": role, "content": message.content[: self._history_chars]}
-                        )
+                if isinstance(message, kind):
+                    text = _text(message.content)
+                    if text:
+                        window.append({"role": role, "content": text[: self._history_chars]})
         return window[-self._history_messages :]
 
 
@@ -425,6 +427,63 @@ def _tool_name(tool) -> str:
 
 def _last_human(messages) -> str:
     for message in reversed(list(messages)):
-        if isinstance(message, HumanMessage) and isinstance(message.content, str):
-            return message.content
+        if isinstance(message, HumanMessage):
+            text = _text(message.content)
+            if text is not None:
+                return text
     return ""
+
+
+# The block types that carry no text to judge: the model reads them as media, and their payload
+# is bytes or a URL. Everything else is screened, whatever its type — LangChain keeps document,
+# search_result, json, custom_tool_call_output and file blocks as tool content, a human turn can
+# carry text-plain, and each one reaches the model as text. Listing what to skip rather than what
+# to read means a block type added later is screened by default: over-screening is the safe
+# failure, a block that slips past is not.
+_MEDIA_BLOCKS = frozenset({"image", "image_url", "audio", "video"})
+# Dropped from a block's JSON form: raw media bytes, which carry no text and would swamp the judge.
+_BINARY_FIELDS = frozenset({"base64", "data_base64", "bytes"})
+
+
+def _text(content) -> str | None:
+    """The text a message carries, whether its content is a string or a list of content blocks.
+
+    LangChain allows both (`str | list[str | dict]`): multimodal messages and MCP tool results with
+    several parts or an image arrive as a list. Plain strings and `{"type": "text"}` blocks are
+    joined with newlines, so text split across blocks is judged as one payload. Any other block —
+    a document, a search result, JSON, a custom tool's output — is judged as its JSON form, since
+    the model reads the text inside it. Pure media blocks are skipped. None when nothing is left.
+    """
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return None
+    parts = []
+    for block in content:
+        if isinstance(block, str):
+            parts.append(block)
+        elif isinstance(block, dict):
+            if block.get("type") in _MEDIA_BLOCKS:
+                continue
+            if block.get("type") == "text" and isinstance(block.get("text"), str):
+                parts.append(block["text"])
+            else:
+                parts.append(_block_json(block))
+    parts = [p for p in parts if p]
+    return "\n".join(parts) if parts else None
+
+
+def _block_json(block: dict) -> str:
+    """A non-text block as JSON for the judge, with raw media bytes dropped at any depth."""
+
+    def strip(value):
+        if isinstance(value, dict):
+            return {k: strip(v) for k, v in value.items() if k not in _BINARY_FIELDS}
+        if isinstance(value, list):
+            return [strip(v) for v in value]
+        return value
+
+    try:
+        return json.dumps(strip(block), ensure_ascii=False, default=str)
+    except (TypeError, ValueError):
+        return str(block)

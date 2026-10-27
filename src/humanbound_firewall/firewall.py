@@ -220,9 +220,17 @@ class Firewall:
         fail: str = "open",
         on_decision=None,
         withheld_template: str | None = None,
+        on_refusal: str = "block",
     ):
         """Deployment choices (classes, mode, fail, on_decision, withheld_template) are the
-        Guard's; `mode` defaults to the policy file's settings.mode. See guard.Guard."""
+        Guard's; `mode` defaults to the policy file's settings.mode. See guard.Guard.
+
+        `on_refusal` is what a Tier 3 judge that refuses to evaluate the payload means (Claude's
+        `refusal` stop, an Azure OpenAI content filter): "block" (the default: the provider's
+        safety layer judged the text harmful) or "review" (uncertain, decided by `fail`)."""
+        if on_refusal not in ("block", "review"):
+            raise ValueError(f"Unknown on_refusal '{on_refusal}'. Expected 'block' or 'review'.")
+        self._on_refusal = on_refusal
         self._config = config
         self._streamer = streamer
         self._ensemble = ensemble
@@ -253,6 +261,7 @@ class Firewall:
         fail: str = "open",
         on_decision=None,
         withheld_template: str | None = None,
+        on_refusal: str = "block",
     ) -> "Firewall":
         """Create a Firewall from configuration.
 
@@ -271,6 +280,8 @@ class Firewall:
             on_decision: Observe-only callback fired with every Decision.
             withheld_template: Text replacing a withheld payload; may use {category},
                 {explanation}, {cls}, {boundary}.
+            on_refusal: block | review — what a judge that refuses to evaluate the payload
+                means (a provider safety refusal or content filter).
         """
         config = load_config(config_path)
 
@@ -321,6 +332,7 @@ class Firewall:
             fail=fail,
             on_decision=on_decision,
             withheld_template=withheld_template,
+            on_refusal=on_refusal,
         )
 
     def evaluate(
@@ -746,7 +758,7 @@ class Firewall:
         from .firewall_judge import stream_and_extract_verdict
 
         return stream_and_extract_verdict(
-            self._streamer, system_prompt, user_prompt, timeout, session_id
+            self._streamer, system_prompt, user_prompt, timeout, session_id, self._on_refusal
         )
 
     def reload_config(self, config_path: str | Path):
