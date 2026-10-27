@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.4] — 2026-10-27
+
 ### Added
 - **`ProviderIntegration.reasoning_effort`.** A judge backed by a reasoning
   model can now be pinned to a reasoning effort (e.g. OpenAI `"minimal"` for a
