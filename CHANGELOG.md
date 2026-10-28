@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Concurrent first judge calls no longer fail on a rejected parameter.** When several calls
+  to an OpenAI or Azure OpenAI model were in flight before any had learned that the model
+  rejects `temperature` (or `reasoning_effort`), only the first retried without it; the others
+  raised the 400, a judge error that a fail-closed firewall turns into a withheld result. Every
+  call now retries without the parameters its own request sent and the model rejected.
+
 ## [0.3.5] — 2026-10-28
 
 ### Added
