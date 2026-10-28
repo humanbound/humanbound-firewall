@@ -60,7 +60,7 @@ class LLMStreamer:
                 )
             except Exception as e:
                 drop = (
-                    _note_rejected(self.model, str(e), getattr(e, "param", None)) & params.keys()
+                    _note_rejected(self.model, str(e), getattr(e, "param", None), sent=params)
                     if getattr(e, "status_code", None) == 400
                     else set()
                 )
@@ -74,7 +74,7 @@ class LLMPinger:
     def __init__(self, provider=None):
         self._provider = _resolve(provider)
 
-    def __do_completion_api_call(self, system_p, user_p, max_tokens, temperature):
+    def __do_completion_api_call(self, system_p, user_p, params):
         integ = self._provider["integration"]
         return requests.post(
             integ.get("endpoint", ""),
@@ -88,9 +88,7 @@ class LLMPinger:
                     {"role": "system", "content": system_p},
                     {"role": "user", "content": user_p},
                 ],
-                **_sampling_params(
-                    integ["model"], max_tokens, temperature, integ.get("reasoning_effort")
-                ),
+                **params,
             },
             timeout=LLM_PING_TIMEOUT,
         )
@@ -100,8 +98,12 @@ class LLMPinger:
     ):
         do_retry_counter = 0
         max_tokens = min(max_tokens, ALLOWED_MAX_OUT_TOKENS)
+        integ = self._provider["integration"]
         while do_retry_counter <= MAX_RETRY_COUNTER:
-            resp = self.__do_completion_api_call(system_p, user_p, max_tokens, temperature)
+            params = _sampling_params(
+                integ["model"], max_tokens, temperature, integ.get("reasoning_effort")
+            )
+            resp = self.__do_completion_api_call(system_p, user_p, params)
             if resp.status_code == 200:
                 result = resp.json()
                 if "choices" not in result or not result["choices"]:
@@ -118,7 +120,7 @@ class LLMPinger:
                     continue
                 raise Exception("502/Rate limit error.")
             elif resp.status_code == 400:
-                if _note_rejected(self._provider["integration"]["model"], resp.text):
+                if _note_rejected(integ["model"], resp.text, sent=params):
                     continue  # retry; the next request omits the param(s) the deployment rejected
                 raise Exception(f"502/Inappropriate content ({resp.text}).")
             else:

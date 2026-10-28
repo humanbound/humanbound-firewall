@@ -5,6 +5,7 @@
 import logging
 import re
 import time
+from collections.abc import Iterable
 from os import getenv
 
 import requests
@@ -57,32 +58,39 @@ def _sampling_params(
     return params
 
 
-def _note_rejected(model: str, error_text: str, param: str | None = None) -> set:
-    """Record, per model, which sampling params a 400 says this model rejects, and return the
-    names recorded *for the first time* on this call. An empty set means the 400 was about
-    something else (or a param already dropped) and must not be retried away — which also stops
-    a mis-scoped 400 from looping forever.
+def _note_rejected(
+    model: str, error_text: str, param: str | None = None, *, sent: Iterable[str]
+) -> set:
+    """Record, per model, which sampling params a 400 says this model rejects, and return those
+    of them the failed request `sent`: the ones to drop before retrying. An empty set means the
+    400 was about something else (or names a param the request did not send) and must not be
+    retried away — which also stops a mis-scoped 400 from looping forever.
+
+    It is judged against what this request sent, not against what was recorded before, so
+    concurrent first calls that all draw the same 400 each retry, not only the first to record it.
 
     `param` is the SDK's structured `error.param`, read first: the openai SDK's message for an
     invalid value ("Invalid value: 'hihg'. Supported values are: ...") does not name the param."""
+    sent = set(sent)
     rejected = set()
-    if (
+    if "temperature" in sent and (
         param == "temperature" or _TEMPERATURE_REJECTED.search(error_text or "")
-    ) and model not in _models_without_temperature:
+    ):
         _models_without_temperature.add(model)
         rejected.add("temperature")
-    if (
+    if "reasoning_effort" in sent and (
         param == "reasoning_effort" or _REASONING_EFFORT_REJECTED.search(error_text or "")
-    ) and model not in _models_without_reasoning_effort:
+    ):
+        if model not in _models_without_reasoning_effort:
+            # The same 400 covers a model without the param and an invalid value (a typo like
+            # "hihg"); either way the configured effort is no longer applied, so say so.
+            logger.warning(
+                "Model %s rejected the configured reasoning_effort; continuing without it: %s",
+                model,
+                error_text,
+            )
         _models_without_reasoning_effort.add(model)
         rejected.add("reasoning_effort")
-        # The same 400 covers a model without the param and an invalid value (a typo like
-        # "hihg"); either way the configured effort is no longer applied, so say so.
-        logger.warning(
-            "Model %s rejected the configured reasoning_effort; continuing without it: %s",
-            model,
-            error_text,
-        )
     return rejected
 
 
@@ -120,7 +128,7 @@ class LLMStreamer:
                 )
             except Exception as e:
                 drop = (
-                    _note_rejected(self.model, str(e), getattr(e, "param", None)) & params.keys()
+                    _note_rejected(self.model, str(e), getattr(e, "param", None), sent=params)
                     if getattr(e, "status_code", None) == 400
                     else set()
                 )
@@ -134,7 +142,7 @@ class LLMPinger:
     def __init__(self, provider=None):
         self._provider = _resolve(provider)
 
-    def __do_completion_api_call(self, system_p, user_p, max_tokens, temperature):
+    def __do_completion_api_call(self, system_p, user_p, params):
         return requests.post(
             OPENAI_CHAT_COMPLETION_ENDPOINT,
             headers={
@@ -147,12 +155,7 @@ class LLMPinger:
                     {"role": "system", "content": system_p},
                     {"role": "user", "content": user_p},
                 ],
-                **_sampling_params(
-                    self._provider["integration"]["model"],
-                    max_tokens,
-                    temperature,
-                    self._provider["integration"].get("reasoning_effort"),
-                ),
+                **params,
             },
             timeout=LLM_PING_TIMEOUT,
         )
@@ -162,8 +165,15 @@ class LLMPinger:
     ):
         do_retry_counter = 0
         max_tokens = min(max_tokens, ALLOWED_MAX_OUT_TOKENS)
+        model = self._provider["integration"]["model"]
         while do_retry_counter <= MAX_RETRY_COUNTER:
-            resp = self.__do_completion_api_call(system_p, user_p, max_tokens, temperature)
+            params = _sampling_params(
+                model,
+                max_tokens,
+                temperature,
+                self._provider["integration"].get("reasoning_effort"),
+            )
+            resp = self.__do_completion_api_call(system_p, user_p, params)
             if resp.status_code == 200:
                 result = resp.json()
                 if "choices" not in result or not result["choices"]:
@@ -180,7 +190,7 @@ class LLMPinger:
                     continue
                 raise Exception("502/Rate limit error.")
             elif resp.status_code == 400:
-                if _note_rejected(self._provider["integration"]["model"], resp.text):
+                if _note_rejected(model, resp.text, sent=params):
                     continue  # retry; the next request omits the param(s) the model rejected
                 raise Exception(f"502/Inappropriate content ({resp.text}).")
             else:
