@@ -17,7 +17,7 @@ from __future__ import annotations
 import sys
 from typing import TYPE_CHECKING
 
-__version__ = "0.3.4"
+__version__ = "0.3.5"
 
 from .models import CLASSES, VERDICT_MAP, AgentConfig, Category, EvalResult, Turn, Verdict
 

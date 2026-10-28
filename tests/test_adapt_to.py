@@ -40,7 +40,7 @@ def test_a_missing_framework_says_how_to_install_it(monkeypatch):
 def test_importing_the_package_does_not_import_any_framework():
     probe = (
         "import sys, humanbound_firewall; from humanbound_firewall import Firewall; "
-        "print(sorted(n for n in sys.modules if n.startswith(('langchain', 'langgraph'))))"
+        "print(sorted(n for n in sys.modules if n.startswith(('langchain', 'langgraph', 'pydantic_ai'))))"
     )
     out = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True, check=True)
     assert out.stdout.strip() == "[]"
