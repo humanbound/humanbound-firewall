@@ -34,10 +34,7 @@ Usage:
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
-import threading
-from collections import deque
 from collections.abc import Iterable
 from typing import Annotated, Any
 
@@ -52,6 +49,7 @@ except ImportError as e:
     ) from e
 
 from ..session import Session
+from ._shared import BoundaryInventory, Lanes, json_without_binary
 
 logger = logging.getLogger(__name__)
 
@@ -80,70 +78,11 @@ def _thread_key() -> str:
         return "default"
 
 
-class _Lanes:
-    """Background judgements for log mode: one lane per thread. A lane runs its jobs one at a time in
-    submission order, each on the session the previous job produced; lanes run in parallel. A lane's
-    worker thread exists only while the lane has work."""
-
-    def __init__(self):
-        self._cond = threading.Condition()
-        self._queues: dict[str, deque] = {}
-        self._sessions: dict[str, Session] = {}
-        self._pending = 0
-
-    def submit(self, key: str, job) -> None:
-        """`job(previous_session_or_None)` judges one payload and returns the session after it."""
-        with self._cond:
-            self._pending += 1
-            queue = self._queues.get(key)
-            if queue is not None:  # the lane's worker is running and will get to it
-                queue.append(job)
-                return
-            self._queues[key] = deque([job])
-        threading.Thread(
-            target=self._drain, args=(key,), daemon=True, name=f"humanbound-firewall-log:{key}"
-        ).start()
-
-    def _drain(self, key: str) -> None:
-        while True:
-            with self._cond:
-                queue = self._queues[key]
-                if not queue:
-                    del self._queues[key]
-                    self._cond.notify_all()
-                    return
-                job = queue.popleft()
-                previous = self._sessions.get(key)
-            session = None
-            try:
-                session = job(previous)
-            except Exception:  # observe-only: a failed judgement never stops the ones after it
-                logger.exception("background firewall judgement failed")
-            with self._cond:
-                if session is not None:
-                    self._sessions[key] = session
-                self._pending -= 1
-                self._cond.notify_all()
-
-    def session(self, key: str, *, release: bool = False) -> Session | None:
-        """The latest session a lane produced. `release` forgets it once the lane is idle (it has been
-        written back to the state, which is where the thread's session lives)."""
-        with self._cond:
-            session = self._sessions.get(key)
-            if release and key not in self._queues:
-                self._sessions.pop(key, None)
-            return session
-
-    def flush(self, timeout: float | None = None) -> bool:
-        with self._cond:
-            return self._cond.wait_for(lambda: self._pending == 0, timeout)
-
-
 class FirewallAgentState(AgentState):
     humanbound_session: NotRequired[Annotated[dict, _merge_tokens]]
 
 
-class HumanboundFirewallMiddleware(AgentMiddleware):
+class HumanboundFirewallMiddleware(BoundaryInventory, AgentMiddleware):
     """Guard every LangChain boundary with a Firewall. Build it with `firewall.adapt_to("langchain")`.
 
     Args:
@@ -160,6 +99,10 @@ class HumanboundFirewallMiddleware(AgentMiddleware):
     """
 
     state_schema = FirewallAgentState
+    ADAPTER = "langchain"
+    FRAMEWORK = "LangChain"
+    HUMAN_TURN = HUMAN_TURN
+    TOOL_HOOK = "wrap_tool_call"
 
     def __init__(
         self,
@@ -179,7 +122,7 @@ class HumanboundFirewallMiddleware(AgentMiddleware):
         self._history_messages = history_messages
         self._history_chars = history_chars
         self._log_blocking = log_blocking
-        self._lanes = _Lanes()
+        self._lanes = Lanes()
 
     def flush(self, timeout: float | None = None) -> bool:
         """Wait until every background (log mode) judgement has been made and reported to
@@ -318,98 +261,7 @@ class HumanboundFirewallMiddleware(AgentMiddleware):
             message = result.model_copy(update={"content": decision.replacement})
         return Command(update={"messages": [message], SESSION_KEY: decision.session.to_json()})
 
-    # ------------------------------------------------------------------ the inventory
-    @property
-    def boundaries(self) -> list[dict[str, Any]]:
-        """The trust-boundary inventory: what this adapter attaches, with class and mode, and what
-        it cannot attach (served by the manual tier)."""
-        guard, config = self.firewall.guard, self.firewall.config
-        rows: list[dict[str, Any]] = [
-            {**HUMAN_TURN, "class": "request", "mode": guard.mode_for("request"), "expects": ""}
-        ]
-        declared = dict.fromkeys([*config.tool_classes, *config.tool_expects])
-        if self._tool_names:
-            # The policy can only describe tools the agent has: a stray entry is not a boundary.
-            stray = [name for name in declared if name not in self._tool_names]
-            if stray:
-                logger.warning(
-                    "agent.yaml tools: entries name tools this agent does not have: %s",
-                    ", ".join(stray),
-                )
-            names = list(self._tool_names)
-        else:
-            names = list(declared)  # no tool list given: the policy's entries are the inventory
-        for name in names:
-            rows.append(self._tool_boundary(name))
-        for kind in config.capabilities:
-            if kind in ("memory", "inter_agent"):
-                rows.append(
-                    {
-                        "name": kind,
-                        "kind": kind,
-                        "hook": None,
-                        "class": None,
-                        "mode": None,
-                        "note": (
-                            "not attachable: no generic LangChain hook — call "
-                            f"firewall.inspect(payload, cls=...) where {kind} content is read"
-                        ),
-                    }
-                )
-        return rows
-
-    def report(self) -> str:
-        """The coverage table: the inventory as text."""
-        config, guard = self.firewall.config, self.firewall.guard
-        head = (
-            f"Humanbound Firewall · {config.name or 'agent'} · adapter=langchain · "
-            f"classes={','.join(guard.classes)}"
-        )
-        table = [("boundary", "kind", "hook", "class", "mode", "note")]
-        for b in self.boundaries:
-            notes = []
-            if b["class"] == "recall":
-                notes.append("integrity mode (declared: recall)")
-            if b.get("expects"):
-                notes.append(f"expects: {b['expects']}")
-            if b.get("note"):
-                notes.append(b["note"])
-            table.append(
-                (
-                    b["name"],
-                    b["kind"],
-                    b["hook"] or "—",
-                    b["class"] or "—",
-                    b["mode"] or "—",
-                    "; ".join(notes),
-                )
-            )
-        widths = [max(len(row[i]) for row in table) for i in range(5)]
-        lines = [head]
-        for row in table:
-            cells = [row[i].ljust(widths[i]) for i in range(5)]
-            lines.append(" " + "  ".join(cells) + "  " + row[5])
-        return "\n".join(line.rstrip() for line in lines)
-
     # ------------------------------------------------------------------ helpers
-    def _tool_boundary(self, name: str, description: str | None = None) -> dict[str, Any]:
-        """What the judge is told about a tool boundary: the tool's own description (what the
-        agent uses it for) and the policy's `expects`, which defaults to that description. The
-        screening call adds `args`, what the tool was called with this time."""
-        cls = self.firewall.config.class_of(name)
-        description = (
-            description if description is not None else self._tool_descriptions.get(name, "")
-        )
-        return {
-            "name": name,
-            "kind": "tools",
-            "hook": "wrap_tool_call",
-            "class": cls,
-            "mode": self.firewall.guard.mode_for(cls),
-            "description": description,
-            "expects": self.firewall.config.tool_expects.get(name) or description,
-        }
-
     def _window(self, messages) -> list[dict]:
         window = []
         for message in messages:
@@ -441,8 +293,6 @@ def _last_human(messages) -> str:
 # to read means a block type added later is screened by default: over-screening is the safe
 # failure, a block that slips past is not.
 _MEDIA_BLOCKS = frozenset({"image", "image_url", "audio", "video"})
-# Dropped from a block's JSON form: raw media bytes, which carry no text and would swamp the judge.
-_BINARY_FIELDS = frozenset({"base64", "data_base64", "bytes"})
 
 
 def _text(content) -> str | None:
@@ -475,15 +325,4 @@ def _text(content) -> str | None:
 
 def _block_json(block: dict) -> str:
     """A non-text block as JSON for the judge, with raw media bytes dropped at any depth."""
-
-    def strip(value):
-        if isinstance(value, dict):
-            return {k: strip(v) for k, v in value.items() if k not in _BINARY_FIELDS}
-        if isinstance(value, list):
-            return [strip(v) for v in value]
-        return value
-
-    try:
-        return json.dumps(strip(block), ensure_ascii=False, default=str)
-    except (TypeError, ValueError):
-        return str(block)
+    return json_without_binary(block)

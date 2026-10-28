@@ -78,6 +78,7 @@ dev = [
     "pre-commit>=3.8",
     "numpy>=1.24",
     "langchain>=1.0",  # the LangChain adapter's tests; the adapter itself has no extra
+    "pydantic-ai-slim>=2.62; python_version >= '3.11'",  # the Pydantic AI adapter's tests; no extra either
 ]
 
 [project.urls]

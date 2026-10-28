@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **A Pydantic AI adapter.** `firewall.adapt_to("pydantic_ai")` returns a Pydantic AI capability
+  (`HumanboundFirewallCapability`) to pass in an agent's `capabilities`. It judges the user's
+  prompt as a `request` before the run reaches the model (a rejected request ends the run with
+  the notice as the reply; the model is never called) and every tool result as `ingest`, or
+  `recall` when the policy says so, before the model reads it. Tool results of any shape are
+  screened: strings, dicts and models, `ToolReturn`, lists of user content (images, audio and video
+  skipped; a text file read as text). The session is kept per `conversation_id`, so it carries
+  across the runs of a conversation; `session(conversation_id)` returns it. Log mode judges in the
+  background as the LangChain adapter does, with `flush()` and `log_blocking=True`; `boundaries`
+  and `report()` give the inventory. No extra: Pydantic AI 2.x is the application's dependency.
+
+### Changed
+- The LangChain adapter's background lanes and boundary inventory moved to a module the adapters
+  share; its behaviour is unchanged.
+
 ## [0.3.4] — 2026-10-27
 
 ### Added
