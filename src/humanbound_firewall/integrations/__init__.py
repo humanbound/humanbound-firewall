@@ -13,6 +13,7 @@ import importlib
 
 ADAPTERS = {
     "langchain": ("humanbound_firewall.integrations.langchain", "HumanboundFirewallMiddleware"),
+    "pydantic_ai": ("humanbound_firewall.integrations.pydantic_ai", "HumanboundFirewallCapability"),
 }
 
 

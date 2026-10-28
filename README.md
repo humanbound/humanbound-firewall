@@ -7,7 +7,7 @@
 <p align="center">
   Multi-tier firewall for AI agents. Screens every path into the model — the user's turn, every tool result, every record coming back from memory — and blocks prompt injections, jailbreaks, and scope violations before the model sees them.
   <br/>
-  <strong>every boundary, one policy</strong> &middot; <strong>4-tier architecture</strong> &middot; <strong>two lines in a LangChain agent</strong>
+  <strong>every boundary, one policy</strong> &middot; <strong>4-tier architecture</strong> &middot; <strong>two lines in a LangChain or Pydantic AI agent</strong>
 </p>
 
 <p align="center">
@@ -68,7 +68,8 @@ pip install humanbound-firewall[all]             # Everything
 ```
 
 Optional per-provider extras: `[openai]`, `[anthropic]`, `[gemini]`. The
-LangChain adapter needs no extra: LangChain is your application's dependency.
+LangChain and Pydantic AI adapters need no extra: the framework is your
+application's dependency.
 
 ### A LangChain agent, two lines
 
@@ -94,6 +95,27 @@ order per thread, with the same verdicts and session a blocking run would give.
 Decisions reach `on_decision` as they land; the adapter's `flush(timeout)` waits
 for pending judgements (call it before a script exits), and
 `adapt_to("langchain", log_blocking=True)` makes log mode wait.
+
+### A Pydantic AI agent, two lines
+
+```python
+from pydantic_ai import Agent
+from humanbound_firewall import Firewall
+
+firewall = Firewall.from_config("agent.yaml")
+agent = Agent(model, tools=tools, capabilities=[firewall.adapt_to("pydantic_ai", tools=tools)])
+```
+
+The adapter is a Pydantic AI capability, the framework's middleware, and guards
+the same boundaries: the user's prompt (`request`) before the run reaches the
+model, and every tool result (`ingest`, or `recall`) before the model reads it.
+A withheld result is replaced by the notice; a rejected request ends the run
+with the notice as the reply, and the model is never called. The session is kept
+per `conversation_id`, which Pydantic AI carries on the message history, so
+passing `message_history` to the next run continues it;
+`capability.session(result.conversation_id)` returns its token. Log mode,
+`flush()`, `log_blocking=True` and `report()` work as in the LangChain adapter.
+Needs Pydantic AI 2.x (Python 3.11+).
 
 ### Any agent: the manual tier
 
