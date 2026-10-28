@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.5] — 2026-10-28
+
 ### Added
 - **A Pydantic AI adapter.** `firewall.adapt_to("pydantic_ai")` returns a Pydantic AI capability
   (`HumanboundFirewallCapability`) to pass in an agent's `capabilities`. It judges the user's
