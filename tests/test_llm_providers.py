@@ -214,6 +214,54 @@ def test_openai_streamer_drops_a_rejected_reasoning_effort_and_remembers_it(
     assert not caplog.text  # warned once per model, not once per call
 
 
+def _recorded_meanwhile(monkeypatch, record):
+    """Make the fake SDK's create() record a rejection before raising it, as a concurrent first
+    call to the same model does while this one is in flight."""
+    import humanbound_firewall.llm.openai as mod
+
+    create = sys.modules["openai"].OpenAI.return_value.chat.completions.create
+
+    def racing(**kwargs):
+        try:
+            return create(**kwargs)
+        except Exception:
+            record(mod)
+            raise
+
+    monkeypatch.setattr(
+        sys.modules["openai"].OpenAI.return_value.chat.completions, "create", racing
+    )
+
+
+def test_openai_streamer_retries_a_temperature_another_call_recorded_meanwhile(monkeypatch):
+    streamer, calls = _streamer(monkeypatch, "gpt-5-mini", reject_temperature=True)
+    _recorded_meanwhile(monkeypatch, lambda mod: mod._models_without_temperature.add("gpt-5-mini"))
+    streamer.ping("s", "u")
+    assert len(calls) == 2 and "temperature" not in calls[1]
+
+
+def test_openai_streamer_retries_a_reasoning_effort_another_call_recorded_meanwhile(monkeypatch):
+    streamer, calls = _streamer(
+        monkeypatch, "gpt-4o", reject_reasoning_effort=True, reasoning_effort="low"
+    )
+    _recorded_meanwhile(monkeypatch, lambda mod: mod._models_without_reasoning_effort.add("gpt-4o"))
+    streamer.ping("s", "u")
+    assert len(calls) == 2 and "reasoning_effort" not in calls[1]
+
+
+def test_openai_streamer_raises_a_400_naming_a_param_it_did_not_send(monkeypatch):
+    """Loop guard: once temperature is dropped, a 400 that still names it is a real error."""
+    import humanbound_firewall.llm.openai as mod
+
+    mod._models_without_temperature.add("gpt-5-mini")
+    streamer, calls = _streamer(monkeypatch, "gpt-5-mini")
+    sys.modules["openai"].OpenAI.return_value.chat.completions.create = MagicMock(
+        side_effect=_TemperatureRejected()
+    )
+    with pytest.raises(_TemperatureRejected):
+        streamer.ping("s", "u")
+
+
 def _pinger_calls(
     monkeypatch, model, reject_temperature=False, reject_reasoning_effort=False, **kw
 ):
@@ -667,3 +715,23 @@ def test_claude_pinger_sends_an_explicit_timeout(monkeypatch):
     )
     assert create.call_args.kwargs["timeout"] == LLM_PING_TIMEOUT
     assert create.call_args.kwargs["max_tokens"] > 8192  # the case the SDK would refuse untimed
+
+
+def test_openai_pinger_retries_a_temperature_another_call_recorded_meanwhile(monkeypatch):
+    import humanbound_firewall.llm.openai as mod
+
+    bodies = []
+
+    def post(url, headers, json, timeout):
+        bodies.append(json)
+        if "temperature" in json:
+            mod._models_without_temperature.add("gpt-5-mini")  # a concurrent call recorded it
+            return MagicMock(status_code=400, text=str(_TemperatureRejected()))
+        return MagicMock(
+            status_code=200, json=lambda: {"choices": [{"message": {"content": "ok"}}]}
+        )
+
+    monkeypatch.setattr(mod.requests, "post", post)
+    pinger = mod.LLMPinger(_provider(ProviderName.OPENAI, model="gpt-5-mini"))
+    assert pinger.ping("s", "u") == "ok"
+    assert len(bodies) == 2 and "temperature" not in bodies[1]
