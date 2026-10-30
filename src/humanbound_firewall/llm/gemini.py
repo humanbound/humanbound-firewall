@@ -5,6 +5,10 @@
 import time
 from os import getenv
 
+# gemini-pro, the previous default, was retired in April 2025 and 404s on every call. A judge
+# only has to emit one letter, so the lite model is the right size and stays well inside the
+# default 30 s timeout.
+DEFAULT_MODEL = "gemini-3.5-flash-lite"
 ALLOWED_MAX_OUT_TOKENS = 4096
 DEFAULT_MAX_OUT_TOKENS = 1024
 MAX_RETRY_COUNTER = 3
@@ -89,7 +93,7 @@ def _resolve(provider):
         return {
             "integration": {
                 "api_key": getenv("LLM_API_KEY", ""),
-                "model": getenv("LLM_MODEL", "gemini-pro"),
+                "model": getenv("LLM_MODEL", DEFAULT_MODEL),
             }
         }
     if hasattr(provider, "model_dump"):

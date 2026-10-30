@@ -902,7 +902,7 @@ def _provider_from_env() -> Provider:
         "openai": ("gpt-4o-mini", ProviderName.OPENAI),
         "azureopenai": ("gpt-4o-mini", ProviderName.AZURE_OPENAI),
         "claude": ("claude-sonnet-4-6", ProviderName.CLAUDE),
-        "gemini": ("gemini-pro", ProviderName.GEMINI),
+        "gemini": ("gemini-3.5-flash-lite", ProviderName.GEMINI),
     }
 
     if provider_name not in defaults:

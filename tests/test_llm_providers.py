@@ -469,6 +469,38 @@ def test_gemini_streamer_happy_path(monkeypatch):
     fake.GenerativeModel.assert_called_once_with("gemini-pro")
 
 
+def test_the_default_gemini_model_is_one_that_still_exists(monkeypatch):
+    """gemini-pro was retired in April 2025: the default must not be a dead model ID."""
+    fake = types.ModuleType("google.generativeai")
+    fake.configure = MagicMock()
+    fake.GenerativeModel = MagicMock()
+    google_pkg = types.ModuleType("google")
+    google_pkg.generativeai = fake
+    monkeypatch.setitem(sys.modules, "google", google_pkg)
+    monkeypatch.setitem(sys.modules, "google.generativeai", fake)
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+    monkeypatch.setenv("LLM_API_KEY", "sk-test")
+
+    from humanbound_firewall.llm.gemini import LLMStreamer
+
+    LLMStreamer()
+    (model,), _ = fake.GenerativeModel.call_args
+    assert model != "gemini-pro", "gemini-pro was retired in April 2025 and 404s"
+
+
+def test_the_two_gemini_defaults_cannot_drift_apart(monkeypatch):
+    """_provider_from_env() carries its own default; it must stay the provider's."""
+    from humanbound_firewall.firewall import _provider_from_env
+    from humanbound_firewall.llm.gemini import DEFAULT_MODEL
+
+    monkeypatch.setenv("HUMANBOUND_FIREWALL_PROVIDER", "gemini")
+    monkeypatch.setenv("HUMANBOUND_FIREWALL_API_KEY", "sk-test")
+    monkeypatch.delenv("HUMANBOUND_FIREWALL_MODEL", raising=False)
+    monkeypatch.delenv("HB_FIREWALL_MODEL", raising=False)
+
+    assert _provider_from_env().integration.model == DEFAULT_MODEL
+
+
 def test_gemini_missing_dep_raises_actionable(monkeypatch):
     monkeypatch.setitem(sys.modules, "google.generativeai", None)
     from humanbound_firewall.llm.gemini import LLMStreamer

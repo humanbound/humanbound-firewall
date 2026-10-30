@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rejects `temperature` (or `reasoning_effort`), only the first retried without it; the others
   raised the 400, a judge error that a fail-closed firewall turns into a withheld result. Every
   call now retries without the parameters its own request sent and the model rejected.
+- **The default Gemini model is `gemini-3.5-flash-lite`.** The previous default, `gemini-pro`,
+  was retired by Google in April 2025 and is no longer in `list_models()`, so every call made
+  without an explicit `LLM_MODEL` failed with a 404. The provider itself was not at fault: the
+  same code returns a verdict with a current model ID.
 
 ## [0.3.5] — 2026-10-28
 
