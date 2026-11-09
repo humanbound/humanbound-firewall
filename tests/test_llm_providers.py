@@ -699,6 +699,12 @@ def test_get_llm_streamer_routes_by_provider_name(monkeypatch):
     assert isinstance(get_llm_streamer(_provider(ProviderName.CLAUDE)), ClaudeStreamer)
     assert isinstance(get_llm_streamer(_provider(ProviderName.GEMINI)), GeminiStreamer)
     assert isinstance(get_llm_streamer(_provider(ProviderName.AZURE_OPENAI)), AzureStreamer)
+    from humanbound_firewall.llm.orcarouter import LLMStreamer as OrcaRouterStreamer
+
+    assert isinstance(get_llm_streamer(_provider(ProviderName.ORCAROUTER)), OrcaRouterStreamer)
+    assert isinstance(
+        get_llm_streamer(_provider(ProviderName.ORCAROUTER_OAUTH)), OrcaRouterStreamer
+    )
 
 
 def test_get_llm_streamer_rejects_unknown_provider():

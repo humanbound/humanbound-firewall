@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **OrcaRouter Cyber Inference as a Tier 3 judge provider.** Two named providers route the judge
+  (and the training-data ping) to OrcaRouter's OpenAI-compatible endpoint at
+  `https://api.orcarouter.ai/v1`: `orcarouter` takes an existing `sk-orca-…` API key, and
+  `orcarouter-oauth` reuses the key from an OAuth 2.0 + PKCE (S256, loopback redirect) connection,
+  which is stored with `0600` permissions and reused until OrcaRouter revokes it. Both adapters
+  produce the same credential, so nothing downstream knows which was used. The provider also reads
+  the live chat model catalog from `GET /v1/models` (`list_models()`), with a small verified
+  fallback list when the catalog is unavailable; `orcacyber-ultra-1.0` and `orcacyber-zero-1.5` are
+  the cyber-tier judges, `orcarouter/auto` the default and `orcarouter/fusion` the general fallback.
+  A revoked key (`401`) raises `OrcaReauthRequired` instead of retrying.
+
 ### Fixed
 - **Concurrent first judge calls no longer fail on a rejected parameter.** When several calls
   to an OpenAI or Azure OpenAI model were in flight before any had learned that the model
