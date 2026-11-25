@@ -12,6 +12,8 @@ class ProviderName(str, Enum):
     AZURE_OPENAI = "azureopenai"
     CLAUDE = "claude"
     GEMINI = "gemini"
+    ORCAROUTER = "orcarouter"
+    ORCAROUTER_OAUTH = "orcarouter-oauth"
 
 
 class ProviderIntegration(BaseModel):

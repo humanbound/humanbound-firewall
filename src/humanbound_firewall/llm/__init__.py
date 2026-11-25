@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2024-2026 Humanbound
-"""LLM provider abstraction — supports OpenAI, Azure OpenAI, Anthropic Claude, and Gemini.
+"""LLM provider abstraction — OpenAI, Azure OpenAI, Anthropic Claude, Gemini and OrcaRouter.
 
 Two interfaces:
 - LLMPinger: non-streaming completion with retry (for training data generation)
@@ -26,6 +26,11 @@ def get_llm_pinger(provider):
         from humanbound_firewall.llm.claude import LLMPinger
     elif name == ProviderName.GEMINI or name == "gemini":
         from humanbound_firewall.llm.gemini import LLMPinger
+    elif name in (ProviderName.ORCAROUTER, ProviderName.ORCAROUTER_OAUTH) or name in (
+        "orcarouter",
+        "orcarouter-oauth",
+    ):
+        from humanbound_firewall.llm.orcarouter import LLMPinger
     else:
         raise ValueError(f"Unsupported LLM provider: {name}")
 
@@ -44,6 +49,11 @@ def get_llm_streamer(provider):
         from humanbound_firewall.llm.claude import LLMStreamer
     elif name == ProviderName.GEMINI or name == "gemini":
         from humanbound_firewall.llm.gemini import LLMStreamer
+    elif name in (ProviderName.ORCAROUTER, ProviderName.ORCAROUTER_OAUTH) or name in (
+        "orcarouter",
+        "orcarouter-oauth",
+    ):
+        from humanbound_firewall.llm.orcarouter import LLMStreamer
     else:
         raise ValueError(f"Unsupported LLM provider: {name}")
 

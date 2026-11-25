@@ -167,6 +167,42 @@ export HUMANBOUND_FIREWALL_PROVIDER=openai
 export HUMANBOUND_FIREWALL_API_KEY=sk-...
 ```
 
+### OrcaRouter Cyber Inference
+
+[OrcaRouter](https://www.orcarouter.ai) is an OpenAI-compatible gateway for security teams
+running authorized, scoped work: a Tier 3 judge routed through it can use cyber-tuned models
+(`orca/orcacyber-ultra-1.0` for security-code review and multi-step reasoning over large code
+bases, `orca/orcacyber-zero-1.5`) that general-purpose gateways often refuse or silently
+downgrade. Provider page: <https://www.orcarouter.ai/cyber>; cyber model catalog:
+<https://www.orcarouter.ai/models?tier=cyber>.
+
+```python
+from humanbound_firewall.llm import Provider, ProviderIntegration, ProviderName
+
+provider = Provider(
+    name=ProviderName.ORCAROUTER,  # "orcarouter-oauth" for a connected account
+    integration=ProviderIntegration(api_key="sk-orca-…", model="orcarouter/auto"),
+)
+```
+
+Inference and model discovery use `https://api.orcarouter.ai/v1` (`ORCA_API_BASE_URL`); account
+authorization uses `https://www.orcarouter.ai` (`ORCA_AUTH_BASE_URL`); `ORCA_BASE_URL` sets both
+for a self-hosted deployment. Two ways to connect, both ending in the same user-owned API key:
+
+| choice | provider name | how the key is supplied |
+|---|---|---|
+| API key | `orcarouter` | `HUMANBOUND_FIREWALL_API_KEY=sk-orca-…`, or `ProviderIntegration(api_key=…)` |
+| Account connect | `orcarouter-oauth` | OAuth 2.0 + PKCE (S256, loopback redirect); the key is stored in `~/.config/humanbound-firewall/orcarouter-credentials.json` (mode 0600) |
+
+The connect flow issues a durable key: it is reused until OrcaRouter revokes it (there is no
+refresh token), and a `401` from the relay asks for a new connection. The connect driver is
+`humanbound_firewall.llm.orcarouter_auth.OrcaPkceConnector` (`connect()`, `load()`, `clear()`).
+
+`humanbound_firewall.llm.orcarouter.list_models(credential)` returns the deployment's live chat
+catalog from `GET /v1/models?capability=chat` (text-output models speaking the OpenAI chat format;
+a model's input modalities come from its declared architecture), with a small verified fallback
+list when the catalog is unreachable.
+
 ### The policy file
 
 ```yaml

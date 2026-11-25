@@ -22,6 +22,7 @@ from .config import load_config
 from .guard import Decision, Guard
 from .judge import build_system_prompt
 from .llm import Provider, ProviderIntegration, ProviderName, get_llm_streamer
+from .llm.orcarouter import DEFAULT_MODEL as ORCAROUTER_DEFAULT_MODEL
 from .metrics import Metrics
 from .models import CLASSES, AgentConfig, Category, EvalResult, Turn, Verdict
 from .session import Session
@@ -903,6 +904,9 @@ def _provider_from_env() -> Provider:
         "azureopenai": ("gpt-4o-mini", ProviderName.AZURE_OPENAI),
         "claude": ("claude-sonnet-4-6", ProviderName.CLAUDE),
         "gemini": ("gemini-3.5-flash-lite", ProviderName.GEMINI),
+        # OrcaRouter Cyber Inference: a pasted key, or the key stored by `llm orcarouter connect`.
+        "orcarouter": (ORCAROUTER_DEFAULT_MODEL, ProviderName.ORCAROUTER),
+        "orcarouter-oauth": (ORCAROUTER_DEFAULT_MODEL, ProviderName.ORCAROUTER_OAUTH),
     }
 
     if provider_name not in defaults:
